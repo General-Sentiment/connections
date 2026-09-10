@@ -1,7 +1,7 @@
 import { ArenaClient } from "@/lib/arena";
 import { RefreshProfile } from "@/components/refresh-profile";
 import { Welcome, hasConnection } from "@/components/welcome";
-import Link from "next/link";
+import Link from "@/components/app-link";
 import { notFound } from "next/navigation";
 import { Header } from "@/components/header";
 import { Card } from "@/components/card";

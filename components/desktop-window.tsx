@@ -114,6 +114,7 @@ export function DesktopWindow({ children }: { children: React.ReactNode }) {
     </button>
     </div>
     <section ref={windowElement} className="browser-window" hidden={!open} aria-label="Connections browser window">
+      <div className="app-progress" aria-hidden="true"><span /></div>
       <header className="browser-chrome">
         <div className="window-traffic-lights">
           <button ref={close} className="window-dot window-dot-close" aria-label="Close Connections window" onClick={() => toggleWindow(false)}><span aria-hidden>×</span></button>

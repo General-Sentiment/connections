@@ -1,12 +1,13 @@
 "use client";
 
 import { useOptimistic, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 const options = [["newest", "Newest"], ["updated", "Updated recently"], ["random", "Random"]] as const;
 type Order = typeof options[number][0];
 
 export function DirectoryOrder({ order, seed }: { order: Order; seed: number }) {
+  const pathname = usePathname();
   const router = useRouter();
   const params = useSearchParams();
   const [active, setActive] = useOptimistic(order);
@@ -21,7 +22,7 @@ export function DirectoryOrder({ order, seed }: { order: Order; seed: number }) 
       query.delete("page");
       if (value === "random") query.set("seed", String(seed));
       else query.delete("seed");
-      router.push(`/?${query}`, { scroll: false });
+      router.push(`${pathname}?${query}`, { scroll: false });
     })}>{label}</button>)}
   </div>;
 }

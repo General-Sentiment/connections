@@ -4,12 +4,12 @@ import { z } from "zod";
 export const intentions = [
   ["conversation", "Conversation"], ["friendship", "Friendship"],
   ["creative_partnership", "Creative partnership"], ["romance", "Romance"],
-  ["meeting_new_people", "Meeting new people"],
+  ["meeting_new_people", "Meeting new people"], ["employment", "Employment"],
 ] as const;
 export const detailsSchema = z.object({
   schema: z.literal("connections_profile"), version: z.literal(1),
   location: z.object({ city: z.string().trim().min(1).max(100), country: z.string().trim().min(1).max(100) }).strict(),
-  open_to: z.array(z.enum(intentions.map(([value]) => value))).min(1).max(5).refine(v => new Set(v).size === v.length, "Choose each intention once."),
+  open_to: z.array(z.enum(intentions.map(([value]) => value))).min(1).max(intentions.length).refine(v => new Set(v).size === v.length, "Choose each intention once."),
   local_only: z.boolean(),
 }).strict();
 export type Details = z.infer<typeof detailsSchema>;

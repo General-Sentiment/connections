@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/app-link";
 import type { Item, Profile } from "@/lib/types";
 import { safeUrl } from "@/lib/urls";
 export function ProfileCard({ item, profile }: { item: Item; profile?: Profile }) {

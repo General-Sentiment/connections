@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/app-link";
 import ReactMarkdown from "react-markdown";
 import type { Item } from "@/lib/types";
 import { arenaUrl, safeUrl } from "@/lib/urls";

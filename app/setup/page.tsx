@@ -1,5 +1,5 @@
 import { Welcome, hasConnection } from "@/components/welcome";
-import Link from "next/link";
+import Link from "@/components/app-link";
 import { Header } from "@/components/header";
 import { authReady, groupId, isDemo } from "@/lib/config";
 import { getSession } from "@/lib/session";
