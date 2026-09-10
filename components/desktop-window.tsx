@@ -1,34 +1,104 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 export function DesktopWindow({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
+  const intro = useSearchParams().get("intro");
+  const [open, setOpen] = useState(intro === "skip");
   const [launching, setLaunching] = useState(false);
   const launchTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const pathname = usePathname();
+  const introStarted = useRef(false);
   const [fullscreen, setFullscreen] = useState(false);
   const viewport = useRef<HTMLDivElement>(null);
+  const windowElement = useRef<HTMLElement>(null);
+  const openingAnimation = useRef<Animation | null>(null);
+  const iconBounds = useRef<DOMRect | null>(null);
   const launcher = useRef<HTMLButtonElement>(null);
   const close = useRef<HTMLButtonElement>(null);
 
   useEffect(() => { viewport.current?.scrollTo(0, 0); }, [pathname]);
 
   useEffect(() => {
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    launchTimers.current = [
-      setTimeout(() => setLaunching(!reducedMotion), 450),
-      setTimeout(() => { setLaunching(false); setOpen(true); }, reducedMotion ? 450 : 2050),
-    ];
-    return () => launchTimers.current.forEach(clearTimeout);
-  }, []);
+    if (intro === "skip") {
+      introStarted.current = true;
+      launchTimers.current.forEach(clearTimeout);
+      setLaunching(false);
+      setOpen(true);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("intro");
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+      return;
+    }
+    if (introStarted.current && intro !== "1") return;
+    const start = () => {
+      if (document.visibilityState !== "visible") return;
+      document.removeEventListener("visibilitychange", start);
+      setOpen(false);
+      setFullscreen(false);
+      setLaunching(false);
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      launchTimers.current = [
+        setTimeout(() => setLaunching(!reducedMotion), 450),
+        setTimeout(() => {
+          introStarted.current = true;
+          openWindow();
+          const url = new URL(window.location.href);
+          if (url.searchParams.get("intro") === "1") {
+            url.searchParams.delete("intro");
+            window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+          }
+        }, reducedMotion ? 450 : 2050),
+      ];
+    };
+    document.addEventListener("visibilitychange", start);
+    start();
+    return () => {
+      launchTimers.current.forEach(clearTimeout);
+      document.removeEventListener("visibilitychange", start);
+    };
+  }, [intro]);
+
+  function openWindow() {
+    const icon = launcher.current?.querySelector(".desktop-app-icon")?.getBoundingClientRect();
+    if (icon) iconBounds.current = icon;
+    setLaunching(false);
+    setOpen(true);
+    requestAnimationFrame(() => {
+      const element = windowElement.current;
+      if (!element || !icon || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const bounds = element.getBoundingClientRect();
+      const x = icon.left + icon.width / 2 - bounds.left;
+      const y = icon.top + icon.height / 2 - bounds.top;
+      openingAnimation.current?.cancel();
+      openingAnimation.current = element.animate([
+        { opacity: 0, transform: "scale(.08)", transformOrigin: `${x}px ${y}px` },
+        { opacity: 1, transform: "scale(1)", transformOrigin: `${x}px ${y}px` },
+      ], { duration: 650, easing: "cubic-bezier(.16,1,.3,1)" });
+    });
+  }
 
   function toggleWindow(next: boolean) {
     launchTimers.current.forEach(clearTimeout);
     setLaunching(false);
-    setOpen(next);
-    requestAnimationFrame(() => (next ? close : launcher).current?.focus());
+    if (next) openWindow();
+    else {
+      const element = windowElement.current;
+      const icon = iconBounds.current;
+      openingAnimation.current?.cancel();
+      const finish = () => { setOpen(false); requestAnimationFrame(() => launcher.current?.focus()); };
+      if (!element || !icon || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { finish(); return; }
+      const bounds = element.getBoundingClientRect();
+      const origin = `${icon.left + icon.width / 2 - bounds.left}px ${icon.top + icon.height / 2 - bounds.top}px`;
+      const animation = element.animate([
+        { opacity: 1, transform: "scale(1)", transformOrigin: origin },
+        { opacity: 0, transform: "scale(.08)", transformOrigin: origin },
+      ], { duration: 450, easing: "cubic-bezier(.7,0,.84,0)", fill: "forwards" });
+      openingAnimation.current = animation;
+      animation.onfinish = () => { finish(); animation.cancel(); };
+    }
+    if (next) requestAnimationFrame(() => close.current?.focus());
   }
 
   return <div className={`desktop${fullscreen ? " desktop-fullscreen" : ""}`}>
@@ -43,7 +113,7 @@ export function DesktopWindow({ children }: { children: React.ReactNode }) {
       {launching && <span className="demo-pointer" aria-hidden="true" />}
     </button>
     </div>
-    <section className="browser-window" hidden={!open} aria-label="Connections browser window">
+    <section ref={windowElement} className="browser-window" hidden={!open} aria-label="Connections browser window">
       <header className="browser-chrome">
         <div className="window-traffic-lights">
           <button ref={close} className="window-dot window-dot-close" aria-label="Close Connections window" onClick={() => toggleWindow(false)}><span aria-hidden>×</span></button>

@@ -1,3 +1,4 @@
+import { Welcome, hasConnection } from "@/components/welcome";
 import Link from "next/link";
 import { Header } from "@/components/header";
 import { Conversation } from "@/components/conversation";
@@ -9,6 +10,7 @@ import { assertParticipant, groupMessages } from "@/lib/conversations";
 import { arenaUrl } from "@/lib/urls";
 export const dynamic = "force-dynamic";
 export default async function Thread({ params }: { params: Promise<{ id: string }> }) {
+  if (!await hasConnection()) return <Welcome />;
   const { id } = await params; const session = await getSession();
   if (isDemo()) return <div className="page chat-page"><Header title="Connection: Maya Chen & Alex Lee" /><Conversation recipient={demoPeople[0]} self={demoPeople[1]} initialMessages={demoMessages} demo /></div>;
   if (!session?.person || !session.token) return <div className="page"><Header title="Private conversation" /><Link className="button" href={`/api/auth/login?next=${encodeURIComponent(`/connections/${id}`)}`}>Log in with Are.na →</Link></div>;

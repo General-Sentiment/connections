@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { ArenaClient, ArenaError } from "./arena";
-import { conversationRef, conversationRefs, database, pairKey, rememberConversation, withLock } from "./store";
+import { pairKey, withLock } from "./coordination";
+import { allItems } from "./arena-discovery";
 import type { Item, Message, Page, Person } from "./types";
 import { selectionSchema } from "./details";
 
@@ -32,12 +33,11 @@ export async function discoverConversations(client: ArenaClient, person: Person,
   let candidates: Page<Item>; let limited = false;
   try { candidates = await client.request<Page<Item>>(`/search?query=${encodeURIComponent("Connection:")}&scope=my&type=Channel&page=${page}&per=24&sort=updated_at_desc`); }
   catch (e) { if (!(e instanceof ArenaError) || e.status !== 403) throw e; candidates = await client.userContents(person.id, "Channel", page, 24); limited = true; }
-  const known = page === 1 ? conversationRefs(person.id).map(ref => ref.channel_id) : [];
-  const ids = [...new Set([...candidates.data.filter(x => x.title?.startsWith("Connection:") && x.visibility === "private").map(x => x.id), ...known])];
+  const ids = [...new Set([...candidates.data.filter(x => x.title?.startsWith("Connection:") && x.visibility === "private").map(x => x.id)])];
   const valid: Item[] = [];
   // This is one bounded page of the user's relevant channels, not account enumeration.
   for (const id of ids.slice(0, 24)) {
-    try { const channel = await client.item("Channel", id); const members = assertParticipant(channel, person.id); rememberConversation(members[0].id, members[1].id, channel.id); valid.push(channel); } catch (e) { if (e instanceof ArenaError && e.status === 429) throw e; }
+    try { const channel = await client.item("Channel", id); assertParticipant(channel, person.id); valid.push(channel); } catch (e) { if (e instanceof ArenaError && e.status === 429) throw e; }
   }
   return { channels: valid, next: candidates.meta.next_page, limited };
 }
@@ -59,20 +59,28 @@ export const messageSchema = z.object({
   requestId: z.string().uuid(), text: z.string().trim().max(10000), attachments: z.array(selectionSchema).max(6),
 }).strict().refine(x => x.text.length || x.attachments.length, "Write a message or attach an item.").refine(x => new Set(x.attachments.map(a => `${a.type}:${a.id}`)).size === x.attachments.length, "Attach each item only once.");
 
+export async function findConversation(client: ArenaClient, sender: Person, recipientId: number) {
+  let candidates: Item[];
+  try { candidates = await allItems(client, `/search?query=${encodeURIComponent("Connection:")}&scope=my&type=Channel&sort=created_at_asc`); }
+  catch (error) {
+    if (!(error instanceof ArenaError) || error.status !== 403) throw error;
+    candidates = await allItems(client, `/users/${sender.id}/contents?type=Channel&sort=created_at_asc`);
+  }
+  for (const item of candidates.filter(item => item.visibility === "private" && item.title?.startsWith("Connection:"))) {
+    let channel: Item;
+    try { channel = await client.item("Channel", item.id); } catch (error) { if (error instanceof ArenaError && error.status === 404) continue; throw error; }
+    if (channel.metadata?.pair === pairKey(sender.id, recipientId)) return channel;
+    try { const members = assertParticipant(channel, sender.id); if (members.some(person => person.id === recipientId)) return channel; } catch { /* Unrelated channel. */ }
+  }
+  return undefined;
+}
+
 export async function ensureConversation(client: ArenaClient, token: string, sender: Person, recipient: Person) {
   if (sender.id === recipient.id) throw new Error("Choose another person to connect with.");
   return withLock(`pair:${pairKey(sender.id, recipient.id)}`, async () => {
-    let ref = conversationRef(sender.id, recipient.id);
-    if (!ref) {
-      // First check the authenticated user's visible channels before creating a new one.
-      await discoverConversations(client, sender);
-      ref = conversationRef(sender.id, recipient.id);
-    }
-    let channel: Item;
-    if (ref) channel = await client.item("Channel", ref.channel_id);
-    else {
-      channel = await client.createChannel(`Connection: ${sender.name} & ${recipient.name}`, { visibility: "private", metadata: { app: "connections", role: "conversation", pair: pairKey(sender.id, recipient.id) } });
-      rememberConversation(sender.id, recipient.id, channel.id);
+    let channel = await findConversation(client, sender, recipient.id);
+    if (!channel) {
+      channel = await client.createChannel(`Connection: ${sender.name} & ${recipient.name}`, { visibility: "private", metadata: { app: "connections", role: "conversation", pair: pairKey(sender.id, recipient.id), submission_id: `conversation:${pairKey(sender.id, recipient.id)}` } });
       channel = await client.item("Channel", channel.id);
     }
     const access = [channel.owner, ...(channel.collaborators || [])].filter(Boolean);
@@ -89,30 +97,26 @@ export async function ensureConversation(client: ArenaClient, token: string, sen
   });
 }
 export async function sendMessage(client: ArenaClient, person: Person, channelId: number, raw: unknown) {
-  const input = messageSchema.parse(raw); const operation = `message:${person.id}:${input.requestId}`;
+  const input = messageSchema.parse(raw);
   return withLock(`send:${channelId}`, async () => {
     const channel = await client.item("Channel", channelId); assertParticipant(channel, person.id);
     const hash = createHash("sha256").update(JSON.stringify({ channelId, text: input.text, attachments: input.attachments })).digest("hex");
-    const prior = database().prepare("SELECT * FROM operations WHERE key=?").get(operation) as { hash: string; status: string } | undefined;
-    if (prior && prior.hash !== hash) throw new Error("This message changed during a retry. Reload the conversation before sending it again.");
-    if (prior?.status === "complete") return { channelId };
     await Promise.all(input.attachments.map(x => client.item(x.type, x.id)));
-    database().prepare("INSERT OR IGNORE INTO operations VALUES(?,?,NULL,'pending',?)").run(operation, hash, Date.now());
-    const recent = await client.contents(channelId, 1, 100, "position_desc");
+    const recent = { data: await allItems(client, `/channels/${channelId}/contents?sort=position_desc`) };
     const existing = recent.data.filter(x => x.connection?.metadata?.message_id === input.requestId && x.connection.connected_by.id === person.id);
+    if (existing.some(item => item.connection?.metadata?.submission_hash && item.connection.metadata.submission_hash !== hash)) throw new Error("This message changed during a retry. Restore the original message before retrying.");
     for (const attachment of input.attachments) {
       const old = recent.data.find(x => x.id === attachment.id && (x.type === "Channel" ? "Channel" : "Block") === attachment.type);
       if (old && old.connection?.metadata?.message_id !== input.requestId) throw new Error("That item is already in this conversation. Remove it from this reply before sending.");
     }
-    if (input.text && !existing.some(x => x.connection?.metadata?.role === "message")) await client.createBlock(channelId, person.name, input.text, "message", { message_id: input.requestId });
+    if (input.text && !existing.some(x => x.connection?.metadata?.role === "message")) await client.createBlock(channelId, person.name, input.text, "message", { message_id: input.requestId, submission_hash: hash });
     for (const attachment of input.attachments) {
       if (!existing.some(x => x.id === attachment.id && (x.type === "Channel" ? "Channel" : "Block") === attachment.type)) {
         // Are.na may allow only one connection of an item per channel. Do not move
         // an old attachment into a new message; fail explicitly if already present.
-        await client.connect(channelId, attachment, { app: "connections", role: "attachment", message_id: input.requestId });
+        await client.connect(channelId, attachment, { app: "connections", role: "attachment", message_id: input.requestId, submission_hash: hash });
       }
     }
-    database().prepare("UPDATE operations SET status='complete',updated=? WHERE key=?").run(Date.now(), operation);
     return { channelId };
   });
 }

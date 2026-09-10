@@ -17,6 +17,8 @@ export async function GET(request: NextRequest) {
     session.token = result.access_token; session.person = { id: person.id, type: "User", name: person.name, slug: person.slug, avatar: person.avatar, tier: person.tier }; await session.save();
     // One page on login; access is verified before importing any channel reference.
     await discoverConversations(new ArenaClient(result.access_token), session.person).catch(() => undefined);
-    return NextResponse.redirect(new URL(oauth.next, appUrl()));
+    const destination = new URL(oauth.next, appUrl());
+    destination.searchParams.set("intro", "skip");
+    return NextResponse.redirect(destination);
   } catch { return fail("Could not reach Are.na. Please try logging in again."); }
 }

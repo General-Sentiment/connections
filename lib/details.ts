@@ -30,5 +30,5 @@ export const profileInputSchema = z.object({
   details: detailsSchema,
   selected: z.array(selectionSchema.extend({ description: z.string().trim().max(5000).default("") })).length(3, "Choose exactly three blocks or channels.").refine(v => new Set(v.map(x => `${x.type}:${x.id}`)).size === 3, "Choose three different items."),
   useAccountPhoto: z.boolean().default(false),
-  photoKey: z.string().max(1000).optional(), removePhoto: z.boolean().default(false),
+  photoProof: z.string().max(4000).optional(), photoKey: z.string().max(1000).optional(), removePhoto: z.boolean().default(false),
 }).strict();

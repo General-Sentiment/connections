@@ -166,7 +166,7 @@
 .profile-editor .selected-controls:empty{display:none}
 .profile-editor .selected-slot + .selected-slot{padding-top:48px}
 .profile-editor .selected-slot textarea{cursor:text}
-.featured-profile-items{width:100%;max-width:477px;margin-inline:auto;display:grid;gap:48px}
+.featured-profile-items{width:100%;max-width:477px;margin-inline:auto;display:grid;gap:88px}
 .featured-description{font-size:20px;line-height:27px;hyphens:auto;margin-top:20px}
 .featured-description p{margin:0 0 1.8em}.featured-description p:last-child{margin-bottom:0}
 .featured-description img{max-width:100%;height:auto}.featured-description pre{white-space:pre-wrap}
@@ -215,14 +215,14 @@ a.desktop-launcher{color:var(--fg);text-decoration:none;border:1px solid transpa
 .desktop-fullscreen .browser-chrome{display:none}
 .desktop-fullscreen .window-content{zoom:1}
 
-.profile-introduction{width:100%;max-width:477px;margin:0 auto 64px}
+.profile-introduction{width:100%;max-width:477px;margin:0 auto 88px}
 .profile-content-photo{width:100%;padding:24px;background:var(--surface);border-radius:4px;margin-bottom:24px}
 .profile-content-photo img{display:block;width:100%;height:240px;object-fit:contain}
 .profile-attributes{font-size:13px;color:var(--muted);margin-bottom:40px}
 .profile-attributes>div{padding:3px 0;gap:20px;align-items:baseline}
 .profile-attributes dt{flex-shrink:0}
 .profile-attributes dd{max-width:68%;font-weight:400}
-.profile-introduction-text{margin-top:32px}
+.profile-introduction-text{margin-top:72px}
 .profile-introduction-text .preview-text{font-size:20px;line-height:27px;margin:16px 0 0}
 
 
@@ -262,3 +262,32 @@ a.desktop-launcher{color:var(--fg);text-decoration:none;border:1px solid transpa
 .desktop-app-icon span+span{border-radius:0}
 
 .connections-mark{width:54px;height:36px;stroke:var(--fg);stroke-width:2;stroke-linejoin:round}
+
+.welcome-screen{min-height:calc((100dvh - 108px)/.9);display:grid;place-items:center;padding:40px 24px;text-align:center}
+.welcome-content{max-width:380px}
+.welcome-content h1{font-size:32px;line-height:1.2;font-weight:400;margin:0 0 22px}
+.welcome-content p{font-size:15px;line-height:1.6;color:var(--muted);margin:0 0 26px}
+.welcome-content a.button{padding:9px 18px}
+.welcome-content .welcome-error{color:var(--error);font-size:13px}
+.desktop-fullscreen .welcome-screen{min-height:100dvh}
+@media(max-width:760px){.welcome-screen{min-height:calc(100dvh - 64px)}}
+.welcome-content h1,.welcome-content>p,.welcome-content>a.button{animation:welcome-enter 600ms cubic-bezier(.2,.7,.2,1) both}
+.welcome-content h1{animation-delay:0ms}
+.welcome-content>p{animation-delay:120ms}
+.welcome-content>a.button{animation-delay:240ms}
+@keyframes welcome-enter{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.welcome-content h1,.welcome-content>p,.welcome-content>a.button{animation:none}}
+.welcome-content h1{animation-delay:325ms}
+.welcome-content>p{animation-delay:445ms}
+.welcome-content>a.button{animation-delay:565ms}
+.browser-chrome{border-bottom-color:var(--border-strong)}
+
+.profile-editor .creation-consent{display:block;margin-bottom:20px}
+.creation-consent .check{margin:14px 0 0}
+.profile-editor.is-saving .creation-consent{opacity:.4}
+
+.recent-blocks-section{margin-top:140px}
+@media(max-width:600px){.recent-blocks-section{margin-top:100px}}
+
+/* Keep the cursor consistent even over links, inputs, and disabled controls. */
+body:has([aria-busy="true"]),body:has([aria-busy="true"]) *{cursor:wait!important}

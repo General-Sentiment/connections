@@ -18,7 +18,11 @@ Without live setup, `DEMO_MODE=true` shows labeled sample data and disables writ
 
 Profile channels belong to the directory group. A sealed operator credential creates those channels and grants each author collaboration; their own token writes profile blocks. Conversation channels belong to a participant, have exactly two individual members, and never use the operator credential. Each conversation read and write rechecks its actual Are.na access list.
 
-Content is stored on Are.na. SQLite in `.data/` holds operational references, retry records and the encrypted operator credential. User tokens are sealed in HTTP-only cookies. Keep `.env.local`, `.data/`, and the session encryption key private. Losing the key invalidates sessions and the stored operator credential; reconnect through setup.
+Content and durable submission metadata live on Are.na. Profiles are discovered through the group's channels, including unfinished profiles; conversations are discovered through the signed-in account and their participant metadata. There is no application database or filesystem storage requirement.
+
+User sessions use encrypted HTTP-only cookies. Photo uploads carry a signed, expiring receipt tied to the uploading account. Pending message drafts and their retry IDs are temporarily kept in browser session storage until sending succeeds. Group IDs, About block ID, and the server-only group operator credential belong in environment variables. Never expose operator credentials through a `NEXT_PUBLIC_` variable.
+
+Retries read existing Are.na items before creating missing parts. Message IDs and payload hashes live in connection metadata; profile and conversation channels have deterministic identity metadata. Local worker locks reduce concurrent submissions, but Are.na does not provide atomic create-once semantics: simultaneous workers or delayed search indexing can still produce duplicates. Failed discovery stops writes instead of assuming no item exists.
 
 ## Checks
 
@@ -32,6 +36,10 @@ The `/setup` page exposes owner-only development checks that perform real tempor
 
 ## Deployment
 
-Use a Node runtime with persistent storage for `DATABASE_PATH`. Run `npm run build` and `npm start`; configure the production `APP_URL`, HTTPS OAuth callback, secrets and backups. This project is not a static export or a Cloudflare Worker build. SQLite coordination assumes one application host.
+Vercel's Node runtime is supported; no writable disk is required. Set `APP_URL` to the deployed origin and register its `/api/auth/callback` URL with Are.na. Configure `ARENA_CLIENT_ID`, `ARENA_CLIENT_SECRET` if used, `SESSION_SECRET`, `ARENA_GROUP_ID`, `ARENA_ABOUT_BLOCK_ID`, and `DEMO_MODE=false`.
+
+Supply `ARENA_OPERATOR_TOKEN` for a group administrator, or `ARENA_DIRECTORY_CREDENTIAL` containing the existing sealed credential encrypted with the same `SESSION_SECRET`. This credential is used only for group-owned profile operations; private conversations use the signed-in user's credential. `/setup` validates configuration; it does not persist settings on the server.
+
+Run `npm run build` and `npm start` locally, or deploy the source with Vercel. The prior `.data/` SQLite files are ignored legacy backups and are no longer read by the app.
 
 Are.na v3 handles content operations. Individual sharing currently depends on its legacy v2 collaborator endpoint; see the plan for verified behavior and remaining live checks.

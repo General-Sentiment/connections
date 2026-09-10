@@ -1,3 +1,5 @@
+> Current storage architecture: Are.na is the only durable application content store. Configuration is in server environment variables; sessions and upload proofs are encrypted/signed. SQLite has been removed. Historical implementation notes below describing SQLite are superseded by this section and the README.
+
 # Connections
 
 ## Purpose
@@ -262,3 +264,15 @@ Each selected block or channel has a description field. A nonempty description i
 ### API request limits
 
 Public GET responses are cached in memory according to Are.na Cache-Control (up to five minutes). Concurrent reads for the same resource/account are combined, and at most three v3 requests run at once. Authenticated responses are never reused after completion. Successful mutations invalidate public cache entries; publication visibility checks bypass cache. A 429 response starts a credential-scoped cooldown using Retry-After or X-RateLimit-Reset, exposed to the UI; chat polling respects it. Directory pages fetch eight entries to reduce cold-load request bursts. This cache and coordination are per application process and reset on restart.
+
+Profiles are published as channels owned by the Connections group. Publishing no longer connects them to the main directory channel; the homepage reads published profile channels from the group directly. The About block is still fetched by its configured block ID.
+
+Profile directory update: new profiles are created by and owned by the signed-in user, then connected to the group-owned Profiles channel (ARENA_PROFILES_CHANNEL / profiles_channel setting). The homepage reads that channel. Existing group-owned profiles remain editable and can be connected without changing their ownership.
+
+Profile ownership: profile channels are owned by the Connections group, with the profile author granted collaborator access. They are connected to the group’s Profiles channel. Individual selected blocks retain their original ownership.
+
+## Database-free retry behavior
+
+Profiles are found by profile_user_id metadata on group-owned channels, including drafts. Messages carry a request ID and payload hash on their connections; retries scan all channel pages and add only missing parts. Conversations are found by participant pair metadata or a verified two-person access list, including partially created channels awaiting their second participant. Scan errors halt creation. In-memory locks are an optimization within one worker only. Are.na search indexing delay and simultaneous requests on different workers remain possible duplicate causes; no atomic uniqueness guarantee is claimed.
+
+The homepage reads published, group-owned profile channels directly from the Connections group. Publishing no longer connects them to an intermediate Profiles channel; ARENA_PROFILES_CHANNEL is not required.

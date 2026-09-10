@@ -1,21 +1,11 @@
-import { sealData, unsealData } from "iron-session";
-import { setting, setSetting } from "./store";
+import { unsealData } from "iron-session";
 import { ArenaClient } from "./arena";
-export async function saveDirectoryCredential(token: string) {
-  if (!process.env.SESSION_SECRET) throw new Error("The session secret is missing.");
-  setSetting("directory_credential", await sealData({ token }, { password: process.env.SESSION_SECRET, ttl: 0 }));
-}
-export async function directoryClient(fallbackToken: string) {
-  const sealed = setting("directory_credential");
-  if (!sealed) return new ArenaClient(fallbackToken);
-  const data = await unsealData<{ token?: string }>(sealed, { password: process.env.SESSION_SECRET!, ttl: 0 });
-  if (!data.token) throw new Error("The directory account needs to reconnect Are.na in Setup.");
-  return new ArenaClient(data.token);
-}
 export async function directoryToken(fallbackToken: string) {
-  const sealed = setting("directory_credential");
+  if (process.env.ARENA_OPERATOR_TOKEN) return process.env.ARENA_OPERATOR_TOKEN;
+  const sealed = process.env.ARENA_DIRECTORY_CREDENTIAL;
   if (!sealed) return fallbackToken;
   const data = await unsealData<{ token?: string }>(sealed, { password: process.env.SESSION_SECRET!, ttl: 0 });
-  if (!data.token) throw new Error("The directory account needs to reconnect Are.na in Setup.");
+  if (!data.token) throw new Error("The configured group credential is invalid. Reconfigure the server's Are.na credential.");
   return data.token;
 }
+export async function directoryClient(fallbackToken: string) { return new ArenaClient(await directoryToken(fallbackToken)); }

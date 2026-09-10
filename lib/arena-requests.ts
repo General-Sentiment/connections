@@ -44,7 +44,9 @@ export async function arenaRequest<T>(path: string, token: string | undefined, o
       if (response.status === 204) return undefined;
       const value = await response.json();
       const control = response.headers.get("Cache-Control") || "";
-      const seconds = Math.min(300, Number(control.match(/(?:^|[,\s])max-age=(\d+)/i)?.[1] || 60));
+      const maxAge = Number(control.match(/(?:^|[,\s])max-age=(\d+)/i)?.[1] || 60);
+      const age = Math.max(0, Number(response.headers.get("Age")) || 0);
+      const seconds = Math.max(0, Math.min(60, maxAge - age));
       if (cacheable && !/no-store|no-cache|private/i.test(control) && generation === state.generation) {
         if (state.cache.size >= 300) state.cache.delete(state.cache.keys().next().value!);
         state.cache.set(key, { value: structuredClone(value), expires: Date.now() + seconds * 1000 });

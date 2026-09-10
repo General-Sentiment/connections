@@ -1,8 +1,10 @@
-import { ArenaClient } from "./arena";
+import { ArenaClient, ArenaError } from "./arena";
 import { blankDetails, parseDetails, profileInputSchema, serializeDetails } from "./details";
 import type { Item, Profile, Person } from "./types";
-import { directoryId, groupId } from "./config";
-import { database, ownerOfProfile, profileRef, publishProfile, rememberProfile, withLock } from "./store";
+import { groupId } from "./config";
+import { withLock } from "./coordination";
+import { allItems } from "./arena-discovery";
+import { unsealData } from "iron-session";
 import { itemKey, safeUrl } from "./urls";
 import type { z } from "zod";
 import { directoryClient, directoryToken } from "./directory-auth";
@@ -19,7 +21,8 @@ export function assembleProfile(channel: Item, items: Item[], person: Person): P
   let parsed = blankDetails; let warning: string | undefined;
   try { parsed = parseDetails(details?.content?.markdown || ""); } catch { warning = "This profile's details need updating."; }
   const managed = new Set([details?.id, biography?.id, description?.id, link?.id, photo?.id]);
-  const selected = items.filter(x => roleOf(x) === "selected" || (!roleOf(x) && !managed.has(x.id))).slice(0, 3);
+  const orderedItems = channel.metadata?.display_order === "position_desc" ? [...items].sort((a, b) => (b.connection?.position || 0) - (a.connection?.position || 0)) : items;
+  const selected = orderedItems.filter(x => roleOf(x) === "selected" || (!roleOf(x) && !managed.has(x.id))).slice(0, 3);
   const selectedDescriptions = Object.fromEntries(items.filter(x => x.type === "Text" && roleOf(x) === "selected_description").map(x => [descriptionRef(x), x.content?.markdown || ""]));
   return { selectedDescriptions, channel, person, whoAreYou: biography?.content?.markdown || "", biographyBlock: biography, lookingFor: description?.content?.markdown || "", details: parsed, selected, photo, profileLink: link, descriptionBlock: description, detailsBlock: details, warning };
 }
@@ -27,7 +30,7 @@ export async function readProfile(channelId: string | number, client = new Arena
   const [channel, contents] = await Promise.all([client.item("Channel", channelId), client.contents(channelId, 1, 24)]);
   if (channel.visibility === "private" || channel.metadata?.app !== "connections" || !channel.metadata?.profile_user_id) throw new Error("This is not a published Connections profile.");
   const person = await client.user(Number(channel.metadata.profile_user_id));
-  return assembleProfile(channel, contents.data, person);
+  return assembleProfile(channel, contents.data.filter(item => item.visibility !== "private" && item.state === "available"), person);
 }
 export async function recentPublic(user: number, type: "Block" | "Channel") {
   const client = new ArenaClient();
@@ -59,27 +62,39 @@ export async function verifySelection(client: ArenaClient, person: Person, refs:
   await Promise.all(refs.map(x => new ArenaClient(undefined, false).item(x.type, x.id)));
   return items;
 }
+export async function availableProfileRef(userId: number, client: ArenaClient) {
+  if (!groupId()) return undefined;
+  const manager = process.env.ARENA_OPERATOR_TOKEN || process.env.ARENA_DIRECTORY_CREDENTIAL ? await directoryClient("") : client;
+  const channels = await allItems(manager, `/groups/${groupId()}/contents?type=Channel&sort=created_at_asc`);
+  for (const candidate of channels.filter(item => item.metadata?.app === "connections" && Number(item.metadata.profile_user_id) === userId)) {
+    try {
+      const channel = await manager.item("Channel", candidate.id);
+      if (channel.owner?.type !== "Group" || channel.owner.id !== groupId() || Number(channel.metadata?.profile_user_id) !== userId) continue;
+      return { user_id: userId, channel_id: channel.id, published: channel.metadata?.published === true ? 1 : 0 };
+    } catch (error) { if (!(error instanceof ArenaError) || error.status !== 404) throw error; }
+  }
+  return undefined;
+}
+
 export async function saveProfile(person: Person, token: string, raw: unknown) {
   const input = profileInputSchema.parse(raw); const client = new ArenaClient(token);
-  if (!groupId() || !directoryId()) throw new Error("The directory has not been configured yet.");
+  if (!groupId()) throw new Error("The directory has not been configured yet.");
   return withLock(`profile:${person.id}`, async () => {
     const verifiedSelections = await verifySelection(client, person, input.selected);
     const manager = await directoryClient(token);
-    const directory = await manager.item("Channel", directoryId());
-    if (directory.visibility === "private") throw new Error("The directory must be publicly visible.");
-    if (!directory.can?.add_to) throw new Error("Your account needs permission to add a profile to the directory channel.");
     const group = await manager.request<{ can?: { manage_members?: boolean } }>(`/groups/${groupId()}`);
     if (!group.can?.manage_members) throw new Error("The directory's account needs to reconnect Are.na before profiles can be published.");
-    let ref = profileRef(person.id);
+    let ref = await availableProfileRef(person.id, client);
     let channel: Item;
     if (ref) {
       channel = await manager.item("Channel", ref.channel_id);
-      if (!channel.can?.update || ownerOfProfile(channel.id) !== person.id || Number(channel.metadata?.profile_user_id) !== person.id) throw new Error("You cannot edit this profile.");
+      if (!channel.can?.update || Number(channel.metadata?.profile_user_id) !== person.id) throw new Error("You cannot edit this profile.");
     } else {
-      channel = await manager.createChannel(person.name, { owner: { id: groupId()!, type: "Group" }, metadata: { app: "connections", schema_version: 1, profile_user_id: person.id, published: false } });
-      rememberProfile(person.id, channel.id); ref = profileRef(person.id)!;
+      channel = await manager.createChannel(person.name, { owner: { id: groupId()!, type: "Group" }, metadata: { app: "connections", schema_version: 1, profile_user_id: person.id, submission_id: `profile:${person.id}`, published: false } });
+      ref = { user_id: person.id, channel_id: channel.id, published: 0 };
     }
-    if (channel.owner?.type !== "Group" || channel.owner.id !== groupId()) throw new Error("Profile channels must be owned by the Connections group.");
+    const userOwned = channel.owner?.type === "User" && channel.owner.id === person.id;
+    if (!userOwned && !(channel.owner?.type === "Group" && channel.owner.id === groupId())) throw new Error("This channel does not belong to the profile author or Connections group.");
     let memberChannel: Item | undefined;
     try { memberChannel = await client.item("Channel", channel.id); } catch { /* Grant the profile author access below. */ }
     if (!memberChannel?.can?.add_to) {
@@ -119,29 +134,26 @@ export async function saveProfile(person: Person, token: string, raw: unknown) {
     }
     for (const previous of oldSelections) if (!input.selected.some(x => `${x.type}:${x.id}` === itemKey(previous)) && previous.connection) await client.disconnect(previous.connection.id);
     for (const previous of oldDescriptions) if (!input.selected.some(x => `${x.type}:${x.id}` === descriptionRef(previous) && x.description) && previous.connection) await client.disconnect(previous.connection.id);
-    // Move each pair to the end in display order. This also keeps descriptions
-    // adjacent after replacement, reordering, and retries of partial writes.
+    // Are.na displays highest positions first. Move the reversed display
+    // sequence to the top, keeping each original followed by its description.
     const arranged = await client.contents(channel.id, 1, 100);
     if (arranged.meta.has_more_pages) throw new Error("This profile has too many items to order safely.");
+    const displayOrder = ["profile_link", "biography", "description", "details", "photo"].map(role => arranged.data.find(item => roleOf(item) === role));
     for (const selected of input.selected) {
       const key = `${selected.type}:${selected.id}`;
-      const pair = [arranged.data.find(x => roleOf(x) === "selected" && itemKey(x) === key), arranged.data.find(x => roleOf(x) === "selected_description" && descriptionRef(x) === key)];
-      for (const item of pair) if (item?.connection) await client.request(`/connections/${item.connection.id}`, { method: "PUT", body: { position: arranged.data.length } });
+      displayOrder.push(arranged.data.find(item => roleOf(item) === "selected" && itemKey(item) === key), arranged.data.find(item => roleOf(item) === "selected_description" && descriptionRef(item) === key));
     }
-    await manager.updateChannel(channel.id, { title: person.name, metadata: { published: true } });
-    if (!ref.published) {
-      const parents = await manager.request<import("./types").Page<Item>>(`/channels/${channel.id}/connections?per=100`);
-      if (!parents.data.some(x => x.id === directory.id)) await manager.connect(directory.id, { id: channel.id, type: "Channel" }, { app: "connections", role: "profile", profile_user_id: person.id });
-      publishProfile(person.id);
-    }
+    for (const item of displayOrder.reverse()) if (item?.connection) await client.request(`/connections/${item.connection.id}/move`, { method: "POST", body: { movement: "move_to_top" } });
+    await (userOwned ? client : manager).updateChannel(channel.id, { title: person.name, metadata: { published: true, display_order: "position_desc" } });
+
     return { channelId: channel.id };
   });
 }
 async function savePhoto(client: ArenaClient, person: Person, channel: number, input: z.infer<typeof profileInputSchema>, items: Item[]) {
   const old = items.filter(x => roleOf(x) === "photo");
   if (input.photoKey) {
-    const upload = database().prepare("SELECT * FROM uploads WHERE key=? AND user_id=? AND expires>?").get(input.photoKey, person.id, Date.now());
-    if (!upload) throw new Error("The photo upload expired. Please select your photo again.");
+    const upload = await unsealData<{ key?: string; userId?: number; expires?: number }>(input.photoProof || "", { password: process.env.SESSION_SECRET!, ttl: 3600 });
+    if (upload.key !== input.photoKey || upload.userId !== person.id || !upload.expires || upload.expires < Date.now()) throw new Error("The photo upload expired. Please select your photo again.");
     const existing = old.find(x => x.connection?.metadata?.upload_key === input.photoKey);
     if (!existing) {
       await client.createBlock(channel, person.name, `https://s3.amazonaws.com/arena_images-temp/${input.photoKey}`, "photo", { upload_key: input.photoKey });

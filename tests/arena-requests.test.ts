@@ -44,3 +44,16 @@ it("bypasses public cache when verifying publication permissions", async () => {
   fetcher.mockImplementation(async () => new Response("{}", { status: 404 }));
   await expect(new ArenaClient(undefined, false).item("Block", 1)).rejects.toMatchObject({ status: 404 }); expect(fetcher).toHaveBeenCalledTimes(2);
 });
+
+it("refreshes external edits after one minute and subtracts upstream cache age", async () => {
+  let now = 100000; vi.spyOn(Date, "now").mockImplementation(() => now);
+  const fetcher = vi.fn(async () => json({ title: "Before" })); vi.stubGlobal("fetch", fetcher);
+  const client = new ArenaClient();
+  await client.item("Block", 1);
+  fetcher.mockImplementation(async () => json({ title: "Edited on Are.na" }));
+  now += 60001;
+  expect((await client.item("Block", 1)).title).toBe("Edited on Are.na");
+  fetcher.mockImplementation(async () => json({ id: 2 }, { Age: "299" }));
+  await client.item("Block", 2); now += 1001; await client.item("Block", 2);
+  expect(fetcher).toHaveBeenCalledTimes(4);
+});
