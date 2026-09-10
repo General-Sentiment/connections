@@ -1,3 +1,4 @@
+import { locationSchema } from "./locations";
 import { parseDocument, stringify } from "yaml";
 import { z } from "zod";
 
@@ -8,7 +9,7 @@ export const intentions = [
 ] as const;
 export const detailsSchema = z.object({
   schema: z.literal("connections_profile"), version: z.literal(1),
-  location: z.object({ city: z.string().trim().min(1).max(100), country: z.string().trim().min(1).max(100) }).strict(),
+  location: locationSchema,
   open_to: z.array(z.enum(intentions.map(([value]) => value))).min(1).max(intentions.length).refine(v => new Set(v).size === v.length, "Choose each intention once."),
   local_only: z.boolean(),
 }).strict();

@@ -10,6 +10,6 @@ export function WelcomeAction() {
   const next = `${pathname}${query.size ? `?${query}` : ""}`;
   return <>
     {error && <p className="welcome-error" role="alert">{error}</p>}
-    <a className="button" href={`/api/auth/login?next=${encodeURIComponent(next)}`}>Connect with Are.na</a>
+    <a className="button welcome-connect" href={`/api/auth/login?next=${encodeURIComponent(next)}`}>Connect with Are.na</a>
   </>;
 }

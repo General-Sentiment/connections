@@ -28,6 +28,6 @@ export class ArenaClient {
     return this.request<{ data: { id: number }[] }>("/connections", { method: "POST", body: { connectable_id: item.id, connectable_type: item.type, channels: [{ id: channel, metadata, ...(position ? { position } : {}) }] } });
   }
   updateBlock(id: number, body: { title?: string; content?: string }) { return this.request<Item>(`/blocks/${id}`, { method: "PUT", body }); }
-  updateChannel(id: number, body: { title?: string; metadata?: Metadata }) { return this.request<Item>(`/channels/${id}`, { method: "PUT", body }); }
+  updateChannel(id: number, body: { title?: string; description?: string; metadata?: Metadata }) { return this.request<Item>(`/channels/${id}`, { method: "PUT", body }); }
   disconnect(connection: number) { return this.request<void>(`/connections/${connection}`, { method: "DELETE" }); }
 }

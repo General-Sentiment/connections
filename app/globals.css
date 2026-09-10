@@ -151,6 +151,7 @@
 
 .profile-editor .form-submit>div{width:100%}
 .profile-editor .form-submit button[type=submit]{width:100%;padding:14px 20px}
+.profile-editor .form-submit .delete-profile{display:block;margin:8px auto 0;font-size:13px}
 
 .profile-fields{transition:opacity 150ms ease}
 .profile-editor.is-saving .profile-fields,.profile-editor.is-saving .form-submit>p{opacity:.4}
@@ -199,7 +200,7 @@ button.window-close:hover{background:var(--hover);color:var(--fg)}
 @media(max-width:760px){.desktop{padding:12px}.browser-chrome{height:38px}.window-content{zoom:1}.window-content .page{padding-inline:20px}}
 
 .desktop-icons{display:flex;align-items:center;justify-content:center;gap:24px}
-.desktop-icons[hidden]{display:none}
+.desktop-icons[hidden]{display:flex;visibility:hidden;pointer-events:none}
 a.desktop-launcher{color:var(--fg);text-decoration:none;border:1px solid transparent;border-radius:3px;min-height:30px}
 .desktop-arena-icon{width:64px;height:56px;display:flex;align-items:center;justify-content:center}
 .desktop-arena-icon svg{width:64px;height:auto}
@@ -210,8 +211,8 @@ a.desktop-launcher{color:var(--fg);text-decoration:none;border:1px solid transpa
 .window-traffic-lights .window-dot-close{background:#ff5f57}
 .window-traffic-lights .window-dot-minimize{background:#febc2e}
 .window-traffic-lights .window-dot-fullscreen{background:#28c840;z-index:1}
-.window-dot span{opacity:0}
-.window-traffic-lights:hover .window-dot span,.window-dot:focus-visible span{opacity:1}
+.window-dot svg{display:block;width:10px;height:10px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1;stroke-linecap:round;opacity:0}
+.window-traffic-lights:hover .window-dot svg,.window-dot:focus-visible svg{opacity:1}
 .window-chrome-spacer{width:52px}
 
 .desktop-fullscreen{padding:0;background:var(--bg)}
@@ -247,7 +248,7 @@ a.desktop-launcher{color:var(--fg);text-decoration:none;border:1px solid transpa
 .desktop-arena-icon svg{width:54px}
 
 .desktop-launcher{position:relative}
-.desktop-app-icon,.desktop-arena-icon{transition:transform 180ms ease}
+.desktop-app-icon,.desktop-arena-icon{transition:transform 180ms ease;will-change:transform}
 .desktop-launcher:hover .desktop-app-icon,.desktop-launcher:hover .desktop-arena-icon{transform:scale(1.07)}
 .demo-pointer{position:absolute;left:calc(50% - 17px);top:41px;width:34px;height:34px;border:1px solid var(--fg);border-radius:50%;background:color-mix(in srgb,var(--fg) 25%,transparent);pointer-events:none;z-index:2;animation:demo-pointer-tap 1500ms ease-in-out both}
 .desktop-launching .desktop-app-icon{animation:demo-icon-tap 1500ms ease-in-out both}
@@ -263,8 +264,19 @@ a.desktop-launcher{color:var(--fg);text-decoration:none;border:1px solid transpa
 @keyframes demo-icon-tap{0%,62%,80%,100%{transform:scale(1)}72%{transform:scale(.94)}}
 @media(prefers-reduced-motion:reduce){.desktop-app-icon,.desktop-arena-icon{transition:none}.demo-pointer{display:none}.desktop-launching .desktop-app-icon{animation:none}}
 .page-heading h1{font-weight:400}
+.chat-page .page-heading h1 .heading-current{color:#b62727}
+@media(prefers-color-scheme:dark){.chat-page .page-heading h1 .heading-current{color:#ef6868}}
+.conversation-info{margin-bottom:40px}
+.conversation-info>section:last-child{grid-column:auto}
+.connection-availability{margin-top:14px;font-size:13px;color:var(--muted)}
+.connection-availability summary{cursor:pointer}
+.info-grid .connection-availability p{font-size:13px;margin-top:8px}
+.connection-availability a{text-decoration:underline}
+.conversation .composer-actions{justify-content:flex-end}
 .directory-heading{padding-bottom:40px}
 .directory-heading nav{min-width:0;flex:1}
+.page-actions .arena-button{width:30px;height:30px;padding:6px;flex-shrink:0}
+.arena-button svg{display:block;width:100%;height:auto}
 .directory-heading .heading-option{display:inline-flex;gap:15px;align-items:baseline;white-space:nowrap}
 .directory-heading h1 a:hover,.directory-heading h1 a:focus-visible{color:var(--fg)}
 @media(max-width:600px){.directory-heading{padding-bottom:25px}.directory-heading .heading-option{gap:10px}}
@@ -274,21 +286,24 @@ a.desktop-launcher{color:var(--fg);text-decoration:none;border:1px solid transpa
 
 .welcome-screen{min-height:calc((100dvh - 108px)/.9);display:grid;place-items:center;padding:40px 24px;text-align:center}
 .welcome-content{max-width:380px}
+.welcome-content .welcome-mark{display:block;width:72px;height:48px;margin:0 auto 22px}
 .welcome-content h1{font-size:32px;line-height:1.2;font-weight:400;margin:0 0 22px}
-.welcome-content p{font-size:15px;line-height:1.6;color:var(--muted);margin:0 0 26px}
+.welcome-content p{font-size:15px;line-height:1.45;color:var(--muted);margin:0 0 26px}
 .welcome-content a.button{padding:9px 18px}
+.welcome-content a.welcome-connect{background:var(--fg);color:var(--bg)}
+.welcome-content a.welcome-connect:hover{background:var(--muted)}
+.welcome-content a.welcome-learn-more{display:table;margin:12px auto 0}
 .welcome-content .welcome-error{color:var(--error);font-size:13px}
 .desktop-fullscreen .welcome-screen{min-height:100dvh}
 @media(max-width:760px){.welcome-screen{min-height:calc(100dvh - 64px)}}
-.welcome-content h1,.welcome-content>p,.welcome-content>a.button{animation:welcome-enter 600ms cubic-bezier(.2,.7,.2,1) both}
-.welcome-content h1{animation-delay:0ms}
-.welcome-content>p{animation-delay:120ms}
-.welcome-content>a.button{animation-delay:240ms}
+.welcome-content .welcome-mark,.welcome-content h1,.welcome-content>p,.welcome-content>a.button{animation:welcome-enter 600ms cubic-bezier(.2,.7,.2,1) both}
+.welcome-content .welcome-mark{animation-delay:325ms}
+.welcome-content h1{animation-delay:445ms}
+.welcome-content>p{animation-delay:565ms}
+.welcome-content>a.button{animation-delay:685ms}
+.welcome-content>a.welcome-learn-more{animation-delay:805ms}
 @keyframes welcome-enter{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-@media(prefers-reduced-motion:reduce){.welcome-content h1,.welcome-content>p,.welcome-content>a.button{animation:none}}
-.welcome-content h1{animation-delay:325ms}
-.welcome-content>p{animation-delay:445ms}
-.welcome-content>a.button{animation-delay:565ms}
+@media(prefers-reduced-motion:reduce){.welcome-content .welcome-mark,.welcome-content h1,.welcome-content>p,.welcome-content>a.button{animation:none}}
 .browser-chrome{border-bottom-color:var(--border-strong)}
 
 .profile-editor .creation-consent{display:block;margin-bottom:20px}
@@ -301,7 +316,9 @@ a.desktop-launcher{color:var(--fg);text-decoration:none;border:1px solid transpa
 /* Keep the cursor consistent even over links, inputs, and disabled controls. */
 body:has([aria-busy="true"]),body:has([aria-busy="true"]) *{cursor:wait!important}
 .browser-window{position:relative}
-.app-progress{position:absolute;top:0;left:0;right:0;height:2px;overflow:hidden;z-index:100;pointer-events:none;opacity:0}
+.app-progress{position:absolute;top:42px;left:0;right:0;height:2px;overflow:hidden;z-index:100;pointer-events:none;opacity:0}
+@media(max-width:760px){.app-progress{top:38px}}
+.desktop-fullscreen .app-progress{top:0}
 .browser-window:has([aria-busy="true"]) .app-progress{opacity:1}
 .app-progress span{display:block;width:35%;height:100%;background:var(--fg)}
 .browser-window:has([aria-busy="true"]) .app-progress span{animation:app-progress 1.3s ease-in-out infinite}
@@ -328,3 +345,24 @@ body:has([aria-busy="true"]),body:has([aria-busy="true"]) *{cursor:wait!importan
   .is-expanded .directory-controls-toggle{position:static;height:36px;margin-top:12px;align-items:center}
   .is-expanded .directory-controls-toggle svg{transform:rotate(180deg)}
 }
+.gallery-table-row{display:grid;grid-template-columns:120px minmax(0,1fr);gap:25px;padding:20px 0;border-top:1px solid var(--rule);text-decoration:none!important}
+.gallery-table-row:last-child{border-bottom:1px solid var(--rule)}
+.gallery-table-row h2{font-size:16px;font-weight:400;margin:0 0 8px}.gallery-table-row p{font-size:13px;margin:0}.gallery-table-row:hover h2{color:var(--muted)}
+.gallery-table-preview{min-width:0}.gallery-table-preview .text-tile{font-size:12px;line-height:16px}
+@media(max-width:700px){.gallery-table-row{grid-template-columns:90px minmax(0,1fr);gap:20px}}
+.location-picker{margin-bottom:16px}.location-picker .field{margin-bottom:4px}.location-picker p{margin:5px 0}.location-suggestions{list-style:none;padding:0;margin:6px 0;border:1px solid var(--rule)}.location-suggestions li+li{border-top:1px solid var(--rule)}.location-suggestions button{display:block;width:100%;text-align:left;white-space:normal;background:transparent;border-radius:0;font-size:14px;font-weight:400;padding:10px}.location-suggestions button:hover{background:var(--hover)}
+.directory-location .field{font-size:12.5px;margin-bottom:10px}.directory-location select{font-size:13px;padding:5px}
+.location-filter{margin-bottom:12px;font-size:13px}.location-filter-label{display:block;color:var(--muted);font-size:12.5px;margin-bottom:4px}
+.location-filter summary{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;list-style:none;padding:5px 0;border-bottom:1px solid var(--rule)}
+.location-filter summary::-webkit-details-marker{display:none}.location-filter summary svg{flex-shrink:0;color:var(--muted)}
+.location-filter details[open] summary svg{transform:rotate(180deg)}
+.location-filter-options{max-height:220px;overflow:auto;padding:4px 0;background:var(--bg)}
+.location-filter-options button{display:block;text-align:left;width:100%;white-space:normal;border:0;border-radius:0;padding:6px 8px;background:transparent;font-size:13px;font-weight:400;color:var(--muted)}
+.location-filter-options button[aria-pressed=true]{color:var(--fg);background:var(--surface)}
+.location-filter-options button:hover{background:var(--hover);color:var(--fg)}
+.location-filter summary:focus-visible,.location-filter-options button:focus-visible{outline:1px solid var(--muted);outline-offset:2px}
+@media(min-width:1100px){.homepage:not(.gallery-page) .info-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+.desktop{position:relative}.desktop-icons{position:absolute;inset:0}
+
+.desktop-logout{position:absolute;bottom:24px;left:0;right:0;text-align:center}.desktop-logout button.quiet{color:var(--dim);font-size:13px;font-weight:400;background:transparent}.desktop-logout button.quiet:hover{color:var(--muted)}

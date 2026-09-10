@@ -43,3 +43,9 @@ Supply `ARENA_OPERATOR_TOKEN` for a group administrator, or `ARENA_DIRECTORY_CRE
 Run `npm run build` and `npm start` locally, or deploy the source with Vercel. The prior `.data/` SQLite files are ignored legacy backups and are no longer read by the app.
 
 Are.na v3 handles content operations. Individual sharing currently depends on its legacy v2 collaborator endpoint; see the plan for verified behavior and remaining live checks.
+
+### Location filtering
+
+City suggestions use Photon (OpenStreetMap) through the authenticated `/api/locations` route. Searches are debounced and cached for a day. `PHOTON_URL` can point to a private Photon server; the default is its public service, intended for modest usage and without an availability guarantee. No API key is required. Suggestions use OSM object IDs, and NYC/New York City share the New York lookup.
+
+Selecting a city saves its ID, region, and ISO country code in the details block. Profile saves mirror these into channel metadata (`location_id`, `location_city`, `location_region`, `location_country`) for filtering before fetching full profiles. Old profiles remain readable; they gain metadata on their next save. Editing city or country clears the previous normalized ID. Unmatched free-text locations remain usable and can be filtered by country after saving, but need a selected suggestion for city filtering. Existing locations are never automatically geocoded or reassigned.

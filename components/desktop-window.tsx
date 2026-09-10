@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
-export function DesktopWindow({ children }: { children: React.ReactNode }) {
+export function DesktopWindow({ children, logout }: { children: React.ReactNode; logout?: React.ReactNode }) {
   const intro = useSearchParams().get("intro");
   const [open, setOpen] = useState(intro === "skip");
   const [launching, setLaunching] = useState(false);
@@ -14,7 +14,8 @@ export function DesktopWindow({ children }: { children: React.ReactNode }) {
   const viewport = useRef<HTMLDivElement>(null);
   const windowElement = useRef<HTMLElement>(null);
   const openingAnimation = useRef<Animation | null>(null);
-  const iconBounds = useRef<DOMRect | null>(null);
+  const animationFrame = useRef<number | null>(null);
+  const closing = useRef(false);
   const launcher = useRef<HTMLButtonElement>(null);
   const close = useRef<HTMLButtonElement>(null);
 
@@ -60,22 +61,58 @@ export function DesktopWindow({ children }: { children: React.ReactNode }) {
     };
   }, [intro]);
 
-  function openWindow() {
+  useEffect(() => () => {
+    if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current);
+    openingAnimation.current?.cancel();
+  }, []);
+
+  function animateWindow(reverse: boolean) {
+    const element = windowElement.current;
     const icon = launcher.current?.querySelector(".desktop-app-icon")?.getBoundingClientRect();
-    if (icon) iconBounds.current = icon;
+    const finish = () => {
+      element?.style.removeProperty("will-change");
+      if (reverse) {
+        // Hide before cancelling the filled animation, avoiding a full-size flash.
+        if (element) element.hidden = true;
+        setOpen(false);
+        launcher.current?.focus();
+      }
+      closing.current = false;
+    };
+    if (!element || !icon?.width || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { finish(); return; }
+    element.style.willChange = "transform, opacity";
+    // Reverse an opening animation in place instead of measuring transformed bounds.
+    const running = openingAnimation.current;
+    if (reverse && running?.playState === "running") {
+      running.onfinish = () => { finish(); running.cancel(); };
+      running.reverse();
+      return;
+    }
+    if (running) { running.onfinish = null; running.cancel(); }
+    const bounds = element.getBoundingClientRect();
+    const origin = `${icon.left + icon.width / 2 - bounds.left}px ${icon.top + icon.height / 2 - bounds.top}px`;
+    const animation = element.animate([
+      { opacity: 0, transform: "scale(0)", transformOrigin: origin, offset: 0 },
+      { opacity: 1, transform: "scale(.2)", transformOrigin: origin, offset: .2 },
+      { opacity: 1, transform: "scale(1)", transformOrigin: origin, offset: 1 },
+    ], { duration: reverse ? 450 : 650, easing: "cubic-bezier(.16,1,.3,1)", direction: reverse ? "reverse" : "normal", fill: "both" });
+    openingAnimation.current = animation;
+    animation.onfinish = () => { finish(); animation.cancel(); };
+  }
+
+  function openWindow() {
+    if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current);
+    closing.current = false;
+    const previous = openingAnimation.current;
+    if (previous) { previous.onfinish = null; previous.cancel(); }
     setLaunching(false);
     setOpen(true);
-    requestAnimationFrame(() => {
-      const element = windowElement.current;
-      if (!element || !icon || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-      const bounds = element.getBoundingClientRect();
-      const x = icon.left + icon.width / 2 - bounds.left;
-      const y = icon.top + icon.height / 2 - bounds.top;
-      openingAnimation.current?.cancel();
-      openingAnimation.current = element.animate([
-        { opacity: 0, transform: "scale(.08)", transformOrigin: `${x}px ${y}px` },
-        { opacity: 1, transform: "scale(1)", transformOrigin: `${x}px ${y}px` },
-      ], { duration: 650, easing: "cubic-bezier(.16,1,.3,1)" });
+    if (windowElement.current) windowElement.current.style.willChange = "transform, opacity";
+    animationFrame.current = requestAnimationFrame(() => {
+      animationFrame.current = null;
+      if (windowElement.current) windowElement.current.hidden = false;
+      animateWindow(false);
+      close.current?.focus();
     });
   }
 
@@ -84,21 +121,11 @@ export function DesktopWindow({ children }: { children: React.ReactNode }) {
     setLaunching(false);
     if (next) openWindow();
     else {
-      const element = windowElement.current;
-      const icon = iconBounds.current;
-      openingAnimation.current?.cancel();
-      const finish = () => { setOpen(false); requestAnimationFrame(() => launcher.current?.focus()); };
-      if (!element || !icon || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { finish(); return; }
-      const bounds = element.getBoundingClientRect();
-      const origin = `${icon.left + icon.width / 2 - bounds.left}px ${icon.top + icon.height / 2 - bounds.top}px`;
-      const animation = element.animate([
-        { opacity: 1, transform: "scale(1)", transformOrigin: origin },
-        { opacity: 0, transform: "scale(.08)", transformOrigin: origin },
-      ], { duration: 450, easing: "cubic-bezier(.7,0,.84,0)", fill: "forwards" });
-      openingAnimation.current = animation;
-      animation.onfinish = () => { finish(); animation.cancel(); };
+      if (closing.current) return;
+      closing.current = true;
+      if (animationFrame.current !== null) { cancelAnimationFrame(animationFrame.current); animationFrame.current = null; }
+      animateWindow(true);
     }
-    if (next) requestAnimationFrame(() => close.current?.focus());
   }
 
   return <div className={`desktop${fullscreen ? " desktop-fullscreen" : ""}`}>
@@ -112,14 +139,15 @@ export function DesktopWindow({ children }: { children: React.ReactNode }) {
       <span>Connections</span>
       {launching && <span className="demo-pointer" aria-hidden="true" />}
     </button>
+    {logout}
     </div>
     <section ref={windowElement} className="browser-window" hidden={!open} aria-label="Connections browser window">
       <div className="app-progress" aria-hidden="true"><span /></div>
       <header className="browser-chrome">
         <div className="window-traffic-lights">
-          <button ref={close} className="window-dot window-dot-close" aria-label="Close Connections window" onClick={() => toggleWindow(false)}><span aria-hidden>×</span></button>
-          <button className="window-dot window-dot-minimize" aria-label="Minimize Connections window" onClick={() => toggleWindow(false)}><span aria-hidden>−</span></button>
-          <button className="window-dot window-dot-fullscreen" aria-label="Show app full screen" onClick={() => setFullscreen(true)}><span aria-hidden>+</span></button>
+          <button ref={close} className="window-dot window-dot-close" aria-label="Close Connections window" onClick={() => toggleWindow(false)}><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2L2 8" /></svg></button>
+          <button className="window-dot window-dot-minimize" aria-label="Minimize Connections window" onClick={() => toggleWindow(false)}><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5h6" /></svg></button>
+          <button className="window-dot window-dot-fullscreen" aria-label="Show app full screen" onClick={() => setFullscreen(true)}><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5h6M5 2v6" /></svg></button>
         </div>
         <div className="window-address">connections.forum<span>{pathname === "/" ? "" : pathname}</span></div>
         <span className="window-chrome-spacer" aria-hidden />

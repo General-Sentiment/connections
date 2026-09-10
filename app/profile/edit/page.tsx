@@ -1,3 +1,4 @@
+import { arenaUrl } from "@/lib/urls";
 import { Welcome, hasConnection } from "@/components/welcome";
 import Link from "@/components/app-link";
 import { Header } from "@/components/header";
@@ -19,5 +20,5 @@ export default async function EditProfile() {
       if (ref) profile = await readProfile(ref.channel_id, client);
     } catch (e) { error = e instanceof Error ? e.message : "Could not load your profile."; }
   }
-  return <div className="page"><Header title={profile ? "Edit profile" : "Add yourself"} />{error ? <p className="notice error">{error}</p> : !demo && !session?.person ? <div className="notice"><p>Log in with Are.na to add yourself. Logging in does not publish a profile.</p><Link className="button" href="/api/auth/login?next=/profile/edit">Log in with Are.na →</Link></div> : <ProfileForm person={session?.person || demoPeople[0]} profile={profile} demo={demo} />}{demo && <p className="preview-note">Preview · Changes are not published.</p>}</div>;
+  return <div className="page"><Header arenaHref={profile ? arenaUrl(profile.channel) : undefined} title={profile ? "Edit profile" : "Add yourself"} />{error ? <p className="notice error">{error}</p> : !demo && !session?.person ? <div className="notice"><p>Log in with Are.na to add yourself. Logging in does not publish a profile.</p><Link className="button" href="/api/auth/login?next=/profile/edit">Log in with Are.na →</Link></div> : <ProfileForm person={session?.person || demoPeople[0]} profile={profile} demo={demo} />}{demo && <p className="preview-note">Preview · Changes are not published.</p>}</div>;
 }

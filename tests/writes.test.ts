@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetArenaRequestsForTests } from "../lib/arena-requests";
 import { ArenaClient } from "../lib/arena";
 import { sendMessage, ensureConversation } from "../lib/conversations";
-import { saveProfile, assembleProfile, availableProfileRef } from "../lib/profiles";
+import { deleteProfile, saveProfile, assembleProfile, availableProfileRef } from "../lib/profiles";
 import type { Item, Person } from "../lib/types";
 
 const alice: Person = { id: 101, type: "User", name: "Alice", slug: "alice", tier: "premium" };
@@ -65,16 +65,17 @@ describe("message persistence", () => {
   });
 });
 describe("profile writes", () => {
-  it("stores a link, biography, description, details and three real connections, and reuses them on edit", async () => {
+  it("stores biography, description, details and three real connections, and reuses them on edit", async () => {
     vi.stubEnv("ARENA_GROUP_ID", "77"); vi.stubEnv("ARENA_PROFILES_CHANNEL", "999");
     const input = { whoAreYou: "An artist in Paris.", lookingFor: "Conversation", details: { schema: "connections_profile", version: 1, location: { city: "Paris", country: "France" }, open_to: ["conversation"], local_only: false }, selected: [1, 2, 3].map(id => ({ id, type: "Block" })) };
     await saveProfile(alice, "token", input); await saveProfile(alice, "token", { ...input, lookingFor: "Creative partnership" });
-    expect(contents).toHaveLength(7);
+    expect(contents).toHaveLength(6);
     expect(channel.owner?.type).toBe("Group");
     expect(channel.owner?.id).toBe(77);
     expect(calls.some(x => x.path === "/v3/connections" && x.body?.channels?.some((channel: { id: number }) => channel.id === 999))).toBe(false);
     expect(contents.find(x => x.title === "details")?.content?.markdown).toContain("```yaml");
-    expect(contents.find(x => x.metadata?.role === "profile_link")?.content?.markdown).toBe("https://www.are.na/alice");
+    expect(contents.some(x => x.metadata?.role === "profile_link")).toBe(false);
+    expect(calls.some(x => x.method === "PUT" && x.body?.description === "https://www.are.na/alice")).toBe(true);
     expect(contents.filter(x => x.connection?.metadata?.role === "selected").map(x => x.id).sort()).toEqual([1, 2, 3]);
     expect(calls.filter(x => x.path === "/v3/blocks" && x.body?.metadata?.role === "selected")).toHaveLength(0);
     expect(calls.filter(x => x.path === "/v3/channels" && x.method === "POST")).toHaveLength(1);
@@ -89,7 +90,7 @@ describe("profile writes", () => {
     input.selected.reverse(); input.selected[0].description = "Changed perspective";
     await saveProfile(alice, "token", input);
     expect(contents.filter(x => x.metadata?.role === "selected_description").map(x => x.id).sort()).toEqual(ids.sort());
-    expect([...contents].reverse().slice(4).map(x => x.title)).toEqual(["Image 3", "Image 3", "Image 2", "Image 2", "Image 1", "Image 1"]);
+    expect([...contents].reverse().slice(3).map(x => x.title)).toEqual(["Image 3", "Image 3", "Image 2", "Image 2", "Image 1", "Image 1"]);
     const profile = assembleProfile(channel, contents, alice);
     expect(profile.selected.map(x => x.id)).toEqual([3, 2, 1]);
     expect(profile.selectedDescriptions?.["Block:3"]).toBe("Changed perspective");
@@ -138,5 +139,25 @@ describe("Are.na profile discovery", () => {
     vi.stubEnv("ARENA_GROUP_ID", "77");
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 500 })));
     await expect(availableProfileRef(alice.id, new ArenaClient("token"))).rejects.toMatchObject({ status: 500 });
+  });
+});
+
+describe("profile deletion", () => {
+  beforeEach(() => {
+    vi.stubEnv("ARENA_GROUP_ID", "77");
+    channel = { ...channel, owner: { type: "Group", id: 77, name: "Connections", slug: "connections" }, metadata: { app: "connections", profile_user_id: alice.id } };
+  });
+  it("deletes only the current user's profile channel", async () => {
+    await expect(deleteProfile(alice, "token", 100)).resolves.toEqual({ deleted: true });
+    expect(calls.filter(call => call.method === "DELETE").map(call => call.path)).toEqual(["/v3/channels/100"]);
+  });
+  it("rejects another user's profile", async () => {
+    await expect(deleteProfile(bob, "token", 100)).rejects.toThrow("your own profile");
+    expect(calls.some(call => call.method === "DELETE")).toBe(false);
+  });
+  it("rejects channels outside the directory group", async () => {
+    channel.owner = alice;
+    await expect(deleteProfile(alice, "token", 100)).rejects.toThrow("your own profile");
+    expect(calls.some(call => call.method === "DELETE")).toBe(false);
   });
 });

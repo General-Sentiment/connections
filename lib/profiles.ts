@@ -1,3 +1,4 @@
+import { locationMetadata, locationSchema } from "./locations";
 import { ArenaClient, ArenaError } from "./arena";
 import { blankDetails, parseDetails, profileInputSchema, serializeDetails } from "./details";
 import type { Item, Profile, Person } from "./types";
@@ -20,6 +21,11 @@ export function assembleProfile(channel: Item, items: Item[], person: Person): P
   const photo = items.find(x => roleOf(x) === "photo");
   let parsed = blankDetails; let warning: string | undefined;
   try { parsed = parseDetails(details?.content?.markdown || ""); } catch { warning = "This profile's details need updating."; }
+  // Retain backfilled IDs when the older details block still names the same place.
+  if (!parsed.location.id && channel.metadata?.location_city === parsed.location.city && channel.metadata?.location_country === locationMetadata(parsed.location).location_country) {
+    const location = locationSchema.safeParse({ ...parsed.location, id: channel.metadata.location_id, region: channel.metadata.location_region || "", country_code: channel.metadata.location_country });
+    if (location.success) parsed = { ...parsed, location: location.data };
+  }
   const managed = new Set([details?.id, biography?.id, description?.id, link?.id, photo?.id]);
   const orderedItems = channel.metadata?.display_order === "position_desc" ? [...items].sort((a, b) => (b.connection?.position || 0) - (a.connection?.position || 0)) : items;
   const selected = orderedItems.filter(x => roleOf(x) === "selected" || (!roleOf(x) && !managed.has(x.id))).slice(0, 3);
@@ -76,6 +82,19 @@ export async function availableProfileRef(userId: number, client: ArenaClient) {
   return undefined;
 }
 
+export async function deleteProfile(person: Person, token: string, channelId: number) {
+  if (!Number.isSafeInteger(channelId) || channelId <= 0) throw new ArenaError(400, "Invalid profile.");
+  return withLock(`profile:${person.id}`, async () => {
+    const manager = await directoryClient(token);
+    const channel = await manager.item("Channel", channelId);
+    if (!groupId() || channel.owner?.type !== "Group" || channel.owner.id !== groupId() || channel.metadata?.app !== "connections" || Number(channel.metadata.profile_user_id) !== person.id) {
+      throw new ArenaError(403, "You can only delete your own profile.");
+    }
+    await manager.request(`/channels/${channel.id}`, { method: "DELETE" });
+    return { deleted: true };
+  });
+}
+
 export async function saveProfile(person: Person, token: string, raw: unknown) {
   const input = profileInputSchema.parse(raw); const client = new ArenaClient(token);
   if (!groupId()) throw new Error("The directory has not been configured yet.");
@@ -112,7 +131,7 @@ export async function saveProfile(person: Person, token: string, raw: unknown) {
       if (existing.user?.id !== person.id) throw new Error("A managed block is owned by a different account. Restore it on Are.na before editing.");
       return client.updateBlock(existing.id, { title, ...(existing.type === "Text" ? { content: value } : {}) });
     };
-    await upsert("profile_link", person.name, `https://www.are.na/${person.slug}`);
+    for (const item of items) if (roleOf(item) === "profile_link" && item.connection) await client.disconnect(item.connection.id);
     await upsert("biography", "Who are you?", input.whoAreYou);
     await upsert("description", "What you’re looking for", input.lookingFor);
     await upsert("details", "details", serializeDetails(input.details));
@@ -138,13 +157,13 @@ export async function saveProfile(person: Person, token: string, raw: unknown) {
     // sequence to the top, keeping each original followed by its description.
     const arranged = await client.contents(channel.id, 1, 100);
     if (arranged.meta.has_more_pages) throw new Error("This profile has too many items to order safely.");
-    const displayOrder = ["profile_link", "biography", "description", "details", "photo"].map(role => arranged.data.find(item => roleOf(item) === role));
+    const displayOrder = ["photo", "biography", "description", "details"].map(role => arranged.data.find(item => roleOf(item) === role));
     for (const selected of input.selected) {
       const key = `${selected.type}:${selected.id}`;
       displayOrder.push(arranged.data.find(item => roleOf(item) === "selected" && itemKey(item) === key), arranged.data.find(item => roleOf(item) === "selected_description" && descriptionRef(item) === key));
     }
     for (const item of displayOrder.reverse()) if (item?.connection) await client.request(`/connections/${item.connection.id}/move`, { method: "POST", body: { movement: "move_to_top" } });
-    await (userOwned ? client : manager).updateChannel(channel.id, { title: person.name, metadata: { published: true, display_order: "position_desc" } });
+    await (userOwned ? client : manager).updateChannel(channel.id, { title: person.name, description: `https://www.are.na/${person.slug}`, metadata: { published: true, display_order: "position_desc", ...locationMetadata(input.details.location) } });
 
     return { channelId: channel.id };
   });
