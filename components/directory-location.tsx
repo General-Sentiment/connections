@@ -24,14 +24,15 @@ export function DirectoryLocation({ locations, country, city }: { locations: Loc
 }
 
 function LocationMenu({ label, allLabel, value, options, onChange }: { label: string; allLabel: string; value: string; options: { value: string; label: string }[]; onChange: (value: string) => void }) {
-  const selected = options.find(option => option.value === value)?.label || (value ? `Selected ${label.toLowerCase()}` : allLabel);
-  return <div className="location-filter">
+  return <label className="location-filter">
     <span className="location-filter-label">{label}</span>
-    <details onKeyDown={event => { if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}>
-      <summary aria-label={`${label}: ${selected}`}><span>{selected}</span><svg width="12" height="8" viewBox="0 0 12 8" fill="none" aria-hidden="true"><path d="m1 1 5 5 5-5" stroke="currentColor" /></svg></summary>
-      <div className="location-filter-options" role="group" aria-label={label}>
-        {[{ value: "", label: allLabel }, ...options].map(option => <button key={option.value} type="button" aria-pressed={value === option.value} onClick={event => { const menu = event.currentTarget.closest("details"); if (menu) { menu.open = false; menu.querySelector("summary")?.focus(); } onChange(option.value); }}>{option.label}</button>)}
-      </div>
-    </details>
-  </div>;
+    <span className="location-select-wrap">
+      <select value={value} onChange={event => onChange(event.target.value)}>
+        <option value="">{allLabel}</option>
+        {value && !options.some(option => option.value === value) && <option value={value}>Selected {label.toLowerCase()}</option>}
+        {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+      <svg width="12" height="8" viewBox="0 0 12 8" fill="none" aria-hidden="true"><path d="m1 1 5 5 5-5" stroke="currentColor" /></svg>
+    </span>
+  </label>;
 }

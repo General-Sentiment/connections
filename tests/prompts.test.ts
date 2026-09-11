@@ -1,9 +1,10 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { profilePrompts } from "../lib/prompts";
+import { profilePrompts, resetPromptCacheForTests } from "../lib/prompts";
 import { resetArenaRequestsForTests } from "../lib/arena-requests";
 import { parseDetails, serializeDetails } from "../lib/details";
-afterEach(() => { vi.unstubAllGlobals(); resetArenaRequestsForTests(); });
-it("reads changing prompt blocks live and follows channel pagination", async () => {
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); resetPromptCacheForTests(); resetArenaRequestsForTests(); });
+it("caches prompts for five minutes and follows channel pagination", async () => {
+  let now = 100000; vi.spyOn(Date, "now").mockImplementation(() => now);
   let text = "We should…";
   const fetcher = vi.fn(async (url: string) => {
     const page = Number(new URL(url).searchParams.get("page"));
@@ -12,6 +13,9 @@ it("reads changing prompt blocks live and follows channel pagination", async () 
   vi.stubGlobal("fetch", fetcher);
   expect(await profilePrompts()).toEqual([{ id: 1, text: "We should…" }]);
   text = "A different prompt";
+  expect(await profilePrompts()).toEqual([{ id: 1, text: "We should…" }]);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  now += 300001;
   expect(await profilePrompts()).toEqual([{ id: 1, text }]);
   expect(fetcher).toHaveBeenCalledTimes(4);
 });

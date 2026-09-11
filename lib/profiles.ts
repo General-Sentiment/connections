@@ -182,7 +182,7 @@ export async function saveProfile(person: Person, token: string, raw: unknown) {
       displayOrder.push(selected.prompt ? arranged.find(item => roleOf(item) === "selected_prompt" && item.id === selected.prompt!.id) : undefined, arranged.find(item => roleOf(item) === "selected" && itemKey(item) === key), arranged.find(item => roleOf(item) === "selected_description" && descriptionRef(item) === key));
     }
     for (const item of displayOrder.reverse()) if (item?.connection) await client.request(`/connections/${item.connection.id}/move`, { method: "POST", body: { movement: "move_to_top" } });
-    await (userOwned ? client : manager).updateChannel(channel.id, { title: person.name, description: `https://www.are.na/${person.slug}`, metadata: { published: true, display_order: "position_desc", ...locationMetadata(input.details.location) } });
+    await (userOwned ? client : manager).updateChannel(channel.id, { title: person.name, description: `https://www.are.na/${person.slug}`, metadata: { hidden: channel.metadata?.hidden === true, published: true, display_order: "position_desc", ...locationMetadata(input.details.location) } });
 
     return { channelId: channel.id };
   });
@@ -209,4 +209,15 @@ async function savePhoto(client: ArenaClient, person: Person, channel: number, i
     }
     for (const photo of old) if (photo.id !== existing?.id && photo.connection) await client.disconnect(photo.connection.id);
   } else if (old[0]?.user?.id === person.id && old[0].title !== person.name) await client.updateBlock(old[0].id, { title: person.name });
+}
+
+export async function setProfileHidden(person: Person, token: string, channelId: number, hidden: boolean) {
+  if (!Number.isSafeInteger(channelId) || channelId <= 0 || typeof hidden !== "boolean") throw new ArenaError(400, "Invalid profile visibility.");
+  return withLock(`profile:${person.id}`, async () => {
+    const manager = await directoryClient(token);
+    const channel = await manager.item("Channel", channelId);
+    if (!groupId() || channel.owner?.type !== "Group" || channel.owner.id !== groupId() || channel.metadata?.app !== "connections" || Number(channel.metadata.profile_user_id) !== person.id) throw new ArenaError(403, "You can only change your own profile.");
+    await manager.updateChannel(channelId, { metadata: { ...channel.metadata, hidden } });
+    return { hidden };
+  });
 }

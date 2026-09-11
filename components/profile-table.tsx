@@ -14,7 +14,7 @@ export function ProfileTable({ entries }: { entries: { item: Item; profile?: Pro
       <div className="table-attributes-preview table-preview">{profile && <dl className="rows table-attributes">
         <div><dt>Location</dt><dd>{[profile.details.location.city, profile.details.location.country].filter(Boolean).join(", ") || "—"}</dd></div>
         <div><dt>Open to</dt><dd>{profile.details.open_to.map(value => intentions.find(([key]) => key === value)?.[1]).join(", ") || "—"}</dd></div>
-        <div><dt>Meeting preference</dt><dd>{profile.details.local_only ? "Local only" : "Open to anywhere"}</dd></div>
+        <div><dt>Meeting preference</dt><dd>{profile.details.local_only ? "Prefer local" : "Open to anywhere"}</dd></div>
       </dl>}</div>
       <div className="table-photo">{image && <Link href={`/people/${item.id}`}><img src={image} alt={profile?.person.name || "Profile photo"} /></Link>}</div>
     </article>;

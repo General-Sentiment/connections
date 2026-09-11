@@ -1,3 +1,5 @@
+import { ProfileVisibility } from "@/components/profile-visibility";
+import { RecentProfileItems } from "@/components/recent-profile-items";
 import { PromptAuthor } from "@/components/prompt-author";
 import { arenaUrl } from "@/lib/urls";
 import { ArenaClient } from "@/lib/arena";
@@ -25,19 +27,21 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   const formatDate = (value: string) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }); };
   const photo = safeUrl(profile.photo?.image?.medium?.src || profile.photo?.image?.src);
   return <div className="page"><RefreshProfile /><Header arenaHref={arenaUrl(profile.channel)} title={profile.person.name} titleHref={`https://www.are.na/${profile.person.slug}`} actions={<>{session?.person?.id === profile.person.id ? <Link className="button" href="/profile/edit">Edit profile</Link> : <Link className="button" href={`/connections/new?person=${profile.person.id}&profile=${profile.channel.id}`}>Connect →</Link>}</>} />
+    {session?.person?.id === profile.person.id && <ProfileVisibility channelId={profile.channel.id} hidden={profile.channel.metadata?.hidden === true} banner />}
     <div className="profile-introduction">
       {photo && <div className="profile-content-photo"><img src={photo} alt={profile.person.name} /></div>}
       <dl className="rows profile-attributes">
         <div><dt>Location</dt><dd>{[profile.details.location.city, profile.details.location.country].filter(Boolean).join(", ") || "—"}</dd></div>
         <div><dt>Open to</dt><dd>{intentions.filter(([value]) => profile.details.open_to.includes(value)).map(([, label]) => label).join(", ") || "—"}</dd></div>
-        <div><dt>Meeting preference</dt><dd>{profile.details.local_only ? "Local only" : "Open to anywhere"}</dd></div>
+        <div><dt>Meeting preference</dt><dd>{profile.details.local_only ? "Prefer local" : "Open to anywhere"}</dd></div>
         <div><dt>Created</dt><dd><time dateTime={profile.channel.created_at}>{formatDate(profile.channel.created_at)}</time></dd></div>
         <div><dt>Last updated</dt><dd><time dateTime={profile.channel.updated_at}>{formatDate(profile.channel.updated_at)}</time></dd></div>
       </dl>
       <section className="profile-introduction-text"><h2 className="info-title">Who are you?</h2><p className="preview-text">{profile.whoAreYou || "—"}</p></section>
       <section className="profile-introduction-text"><h2 className="info-title">Looking for</h2><p className="preview-text">{profile.lookingFor || "—"}</p></section>
     </div>
-    {profile.warning && <p className="notice">{profile.warning}</p>}{[["Selected", profile.selected], ["Recent blocks", blocks], ["Recent channels", channels]].map(([title, entries]) => <section key={title as string} className={`content-section${title !== "Selected" ? " recent-blocks-section" : ""}`}>{title !== "Selected" && <h2 className="section-heading">{title as string}</h2>}<div className={title === "Selected" ? "featured-profile-items" : "grid recent-grid"}>{(entries as Item[]).map(item => <div key={itemKey(item)}>{title === "Selected" && profile.details.selected_prompts?.[itemKey(item)] && <p className="profile-selection-prompt">{profile.details.selected_prompts[itemKey(item)].text}<PromptAuthor prompt={profile.details.selected_prompts[itemKey(item)]} /></p>}<Card item={item} />{title === "Selected" && profile.selectedDescriptions?.[itemKey(item)] && <div className="featured-description"><ReactMarkdown skipHtml>{profile.selectedDescriptions[itemKey(item)]}</ReactMarkdown></div>}</div>)}</div>{!(entries as Item[]).length && <p className="empty">{title === "Selected" ? "No selections available." : recentError || "No public items yet."}</p>}</section>)}
+    {profile.warning && <p className="notice">{profile.warning}</p>}{[["Selected", profile.selected]].map(([title, entries]) => <section key={title as string} className={`content-section${title !== "Selected" ? " recent-blocks-section" : ""}`}>{title !== "Selected" && <h2 className="section-heading">{title as string}</h2>}<div className={title === "Selected" ? "featured-profile-items" : "grid recent-grid"}>{(entries as Item[]).map(item => <div key={itemKey(item)}>{title === "Selected" && profile.details.selected_prompts?.[itemKey(item)] && <p className="profile-selection-prompt"><a href={`https://www.are.na/block/${profile.details.selected_prompts[itemKey(item)].id}`} target="_blank" rel="noopener noreferrer">{profile.details.selected_prompts[itemKey(item)].text}</a><PromptAuthor prompt={profile.details.selected_prompts[itemKey(item)]} /></p>}<Card item={item} />{title === "Selected" && profile.selectedDescriptions?.[itemKey(item)] && <div className="featured-description"><ReactMarkdown skipHtml>{profile.selectedDescriptions[itemKey(item)]}</ReactMarkdown></div>}</div>)}</div>{!(entries as Item[]).length && <p className="empty">{title === "Selected" ? "No selections available." : recentError || "No public items yet."}</p>}</section>)}
+    <RecentProfileItems user={profile.person.id} type="Block" initial={blocks} initialError={recentError} demo={demo} /><RecentProfileItems user={profile.person.id} type="Channel" initial={channels} initialError={recentError} demo={demo} />
     {demo && <p className="preview-note">Sample profile · Public Are.na blocks are shown as rendering examples.</p>}
   </div>;
 }

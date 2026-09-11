@@ -44,7 +44,7 @@ export default async function Directory({ searchParams }: { searchParams: Promis
   else if (groupId()) { try {
     const client = order === "random" ? await directoryClient("") : new ArenaClient();
     const path = order === "random" ? `/search?query=*&group_id=${groupId()}&type=Channel&sort=random&seed=${seed}` : `/groups/${groupId()}/contents?type=Channel&sort=${order === "updated" ? "updated_at_desc" : "created_at_desc"}`;
-    items = (await allItems(client, path)).filter(x => x.type === "Channel" && x.visibility !== "private" && x.owner?.type === "Group" && x.owner.id === groupId() && x.metadata?.app === "connections" && x.metadata?.published === true);
+    items = (await allItems(client, path)).filter(x => x.type === "Channel" && x.visibility !== "private" && x.owner?.type === "Group" && x.owner.id === groupId() && x.metadata?.app === "connections" && x.metadata?.published === true && x.metadata?.hidden !== true);
   } catch (e) { error = e instanceof Error ? e.message : "The directory could not be loaded."; } }
   if (demo) {
     if (order === "random") items.sort((a, b) => ((Math.imul(a.id ^ seed, 2654435761) >>> 0) - (Math.imul(b.id ^ seed, 2654435761) >>> 0)));
@@ -59,7 +59,7 @@ export default async function Directory({ searchParams }: { searchParams: Promis
   })).values()];
   items = items.filter(item => locationMatches(item.metadata, country, city));
   let about = hasFilter ? undefined : items.find(item => item.type === "Text" && item.title === "About");
-  if (!hasFilter && !demo && !about && aboutBlockId()) {
+  if (view !== "table" && !hasFilter && !demo && !about && aboutBlockId()) {
     try { const block = await new ArenaClient().item("Block", aboutBlockId()); if (block.type === "Text" && block.visibility !== "private") about = block; } catch { /* Other directory content remains available. */ }
   }
   items = items.filter(item => item.type === "Channel");
@@ -80,7 +80,7 @@ export default async function Directory({ searchParams }: { searchParams: Promis
     <MobileDirectoryControls><div className="info-grid"><section><h2 className="info-title">View</h2><DirectoryView view={view} /></section><section><h2 className="info-title">Order</h2><DirectoryOrder order={order} seed={seed} /></section><section><h2 className="info-title">Open to</h2><DirectoryFilter value={filter || "all"} /></section><section><h2 className="info-title">Location</h2><DirectoryLocation locations={locations} country={country} city={city} /></section></div></MobileDirectoryControls>
     {query.error && <p className="notice error" role="alert">{query.error}</p>}{error && <p className="notice error" role="alert">{error}</p>}
     {!demo && !groupId() && <div className="notice"><p>The directory is being set up.</p><Link href="/setup">Continue setup →</Link></div>}
-    {view === "table" ? <ProfileTable entries={entries} /> : <div className="grid">{!existingProfile?.published && <Link className="add-square add-yourself-tile" href="/profile/edit"><span aria-hidden>＋</span><span className="add-yourself-label">Add Yourself</span></Link>}{about && <Card item={about} />}{entries.filter(entry => entry.item.type === "Channel").map(({ item, profile }) => <ProfileCard key={item.id} item={item} profile={profile} />)}</div>}
+    {view === "table" ? <ProfileTable entries={entries.filter(entry => entry.item.type === "Channel")} /> : <div className="grid">{!existingProfile?.published && <Link className="add-square add-yourself-tile" href="/profile/edit"><span aria-hidden>＋</span><span className="add-yourself-label">Add Yourself</span></Link>}{about && <Card item={about} />}{entries.filter(entry => entry.item.type === "Channel").map(({ item, profile }) => <ProfileCard key={item.id} item={item} profile={profile} />)}</div>}
     {!error && hasFilter && !entries.length && <p className="empty">No profiles match these filters.</p>}
     <div className="footer-actions"><span>{page > 1 && <Link href={pageHref(page - 1)}>← Previous</Link>}</span>{next && <Link href={pageHref(next)}>Next →</Link>}</div>
     {demo && <p className="preview-note">Preview · Sample profiles. Nothing here has been published to Are.na. <Link href="/setup">Connect the live directory →</Link></p>}
