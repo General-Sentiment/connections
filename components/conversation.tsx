@@ -1,11 +1,13 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Message, Person } from "@/lib/types";
 import { Card } from "./card";
-import { itemKey } from "@/lib/urls";
+import { relativeTime } from "@/lib/relative-time";
+import { messageGroups } from "@/lib/message-groups";
+import { itemKey, safeUrl } from "@/lib/urls";
 
 function mergeMessages(old: Message[], incoming: Message[]) {
   const result = new Map(old.map(x => [x.id, x]));
@@ -17,6 +19,27 @@ export function Conversation({ channelId, recipient, self, initialMessages = [],
   const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [pollError, setPollError] = useState("");
   const requestId = useRef<string>(""); const bottom = useRef<HTMLDivElement>(null); const [olderBusy, setOlderBusy] = useState(false);
   const retryAt = useRef(0);
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const update = () => setNow(Date.now());
+    update();
+    const timer = setInterval(update, 30000);
+    window.addEventListener("focus", update);
+    return () => { clearInterval(timer); window.removeEventListener("focus", update); };
+  }, []);
+  const messageInput = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const input = messageInput.current;
+    if (!input) return;
+    const resize = () => { input.style.height = "0px"; input.style.height = `${input.scrollHeight}px`; };
+    resize();
+    let width = input.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (input.clientWidth !== width) { width = input.clientWidth; resize(); }
+    });
+    observer.observe(input);
+    return () => observer.disconnect();
+  }, [text]);
   const pendingKey = `connections:pending:${self.id}:${recipient.id}`;
   useEffect(() => {
     try {
@@ -53,12 +76,12 @@ export function Conversation({ channelId, recipient, self, initialMessages = [],
       else { await refresh(); setTimeout(() => bottom.current?.scrollIntoView({ behavior: "smooth" }), 50); }
     } catch (e) { setError(e instanceof Error ? e.message : "Your reply could not be sent."); } finally { setBusy(false); }
   }
-  return <div className="conversation"><div className="info-grid conversation-info"><section><h2 className="info-title">Info</h2><p>Only you and {recipient.name} {channelId ? "have" : "will have"} access to this private channel on Are.na. The Connections group is not a collaborator.</p></section></div><div className="thread">{next && <button disabled={olderBusy} className="quiet" onClick={async () => { setOlderBusy(true); try { await refresh(next); } catch (e) { setError(e instanceof Error ? e.message : "Could not load earlier messages."); } finally { setOlderBusy(false); } }}>{olderBusy ? "Loading…" : "Load earlier messages"}</button>}
+  return <div className="conversation"><div className="info-grid conversation-info"><section><h2 className="info-title">Members</h2><div className="conversation-members">{[self, recipient].map(person => <a key={person.id} className="conversation-member" href={`https://www.are.na/${encodeURIComponent(person.slug)}`} target="_blank" rel="noopener noreferrer" aria-label={`${person.name} on Are.na`} title={person.name}>{safeUrl(person.avatar) ? <img src={safeUrl(person.avatar)} alt="" /> : <span aria-hidden="true">{person.name.trim().charAt(0).toUpperCase()}</span>}</a>)}</div></section><section><h2 className="info-title">Privacy</h2><p>Only you and {recipient.name} {channelId ? "have" : "will have"} access to this private channel on Are.na.</p></section></div><div className="thread">{next && <button disabled={olderBusy} className="quiet" onClick={async () => { setOlderBusy(true); try { await refresh(next); } catch (e) { setError(e instanceof Error ? e.message : "Could not load earlier messages."); } finally { setOlderBusy(false); } }}>{olderBusy ? "Loading…" : "Load earlier messages"}</button>}
     {!messages.length && <p className="first-message">Start a conversation with {recipient.name}.</p>}
-    {messages.map(message => <article className={`message ${message.sender.id === self.id ? "own" : ""}`} key={message.id}><div className="message-byline"><strong>{message.sender.name}</strong><time dateTime={message.sentAt}>{new Date(message.sentAt).toLocaleString("en", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC</time></div>{message.text && <div className="message-text"><ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={{ a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a> }}>{message.text}</ReactMarkdown></div>}{message.attachments.length > 0 && <div className="message-attachments">{message.attachments.map(item => <Card key={itemKey(item)} item={item} />)}</div>}</article>)}<div ref={bottom} />{pollError && <p role="status" className="small muted">{pollError}</p>}</div>
+    {messageGroups(messages).map(group => <section className="message-group" key={group.id}><div className="message-group-time"><time dateTime={group.sentAt} title={new Date(group.sentAt).toUTCString()}>{now === null ? "\u00a0" : relativeTime(group.sentAt, now)}</time></div>{group.messages.map((message, index) => <article className={`message ${message.sender.id === self.id ? "own" : ""}${group.messages[index - 1]?.sender.id === message.sender.id ? " message-continuation" : ""}`} aria-label={`Message from ${message.sender.name}`} key={message.id}>{group.messages[index - 1]?.sender.id !== message.sender.id && <div className="message-byline"><strong><a href={`https://www.are.na/${encodeURIComponent(message.sender.slug)}`} target="_blank" rel="noopener noreferrer">{message.sender.name}</a></strong></div>}{message.text && <div className="message-text"><ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={{ a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a> }}>{message.text}</ReactMarkdown></div>}{message.attachments.length > 0 && <div className="message-attachments">{message.attachments.map(item => <Card key={itemKey(item)} item={item} />)}</div>}</article>)}</section>)}<div ref={bottom} />{pollError && <p role="status" className="small muted">{pollError}</p>}</div>
     <form aria-busy={busy} className="composer" onSubmit={e => { e.preventDefault(); void send(); }}><fieldset disabled={busy} className="form-fieldset">
-      <textarea aria-label="Private Message" placeholder="Private Message" maxLength={10000} value={text} onChange={e => changeText(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void send(); } }} />
-      {error && <p role="alert" className="error small">{error}</p>}<div className="composer-actions"><button type="submit" disabled={busy || !text.trim()}>{busy ? "Sending…" : "Send"}</button></div>
-    </fieldset></form>{demo && <p className="preview-note">Sample conversation · Messages are not sent.</p>}
+      <textarea ref={messageInput} rows={1} aria-label="Private Message" placeholder="Private Message" maxLength={10000} value={text} onChange={e => changeText(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void send(); } }} />
+      <button className="composer-send" type="submit" aria-label={busy ? "Sending message" : "Send message"} disabled={busy || !text.trim()}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6" /></svg></button>
+    </fieldset>{error && <p role="alert" className="error small">{error}</p>}</form>{demo && <p className="preview-note">Sample conversation · Messages are not sent.</p>}
   </div>;
 }

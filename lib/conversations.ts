@@ -29,9 +29,16 @@ export function assertParticipant(channel: Item, user: number) {
   if (!channel.can?.add_to) throw new ArenaError(403, "You do not have write access to this conversation.");
   return people;
 }
+// Search the naming convention within accessible content, rather than every
+// public channel mentioning connections. Access is still verified separately.
+function conversationQuery(person: Person) {
+  const name = person.name.replace(/["\\]/g, " ").trim();
+  if (!name) throw new Error("Your Are.na account needs a name to find conversations.");
+  return encodeURIComponent(`"Connection:" "${name}"`);
+}
 export async function discoverConversations(client: ArenaClient, person: Person, page = 1) {
   let candidates: Page<Item>; let limited = false;
-  try { candidates = await client.request<Page<Item>>(`/search?query=${encodeURIComponent("Connection:")}&scope=my&type=Channel&page=${page}&per=24&sort=updated_at_desc`); }
+  try { candidates = await client.request<Page<Item>>(`/search?query=${conversationQuery(person)}&scope=all&type=Channel&page=${page}&per=24&sort=updated_at_desc`); }
   catch (e) { if (!(e instanceof ArenaError) || e.status !== 403) throw e; candidates = await client.userContents(person.id, "Channel", page, 24); limited = true; }
   const ids = [...new Set([...candidates.data.filter(x => x.title?.startsWith("Connection:") && x.visibility === "private").map(x => x.id)])];
   const valid: Item[] = [];
@@ -40,6 +47,18 @@ export async function discoverConversations(client: ArenaClient, person: Person,
     try { const channel = await client.item("Channel", id); assertParticipant(channel, person.id); valid.push(channel); } catch (e) { if (e instanceof ArenaError && e.status === 429) throw e; }
   }
   return { channels: valid, next: candidates.meta.next_page, limited };
+}
+export async function allConversations(client: ArenaClient, person: Person) {
+  const channels = new Map<number, Item>();
+  let page: number | null = 1;
+  for (let rounds = 0; page !== null && rounds < 50; rounds++) {
+    const result = await discoverConversations(client, person, page);
+    for (const channel of result.channels) channels.set(channel.id, channel);
+    if (result.next !== null && result.next <= page) throw new Error("Could not load the next page of conversations.");
+    page = result.next;
+  }
+  if (page !== null) throw new Error("There are too many conversations to load at once.");
+  return [...channels.values()];
 }
 export function groupMessages(items: Item[]): Message[] {
   const messages = new Map<string, Message>();
@@ -61,7 +80,7 @@ export const messageSchema = z.object({
 
 export async function findConversation(client: ArenaClient, sender: Person, recipientId: number) {
   let candidates: Item[];
-  try { candidates = await allItems(client, `/search?query=${encodeURIComponent("Connection:")}&scope=my&type=Channel&sort=created_at_asc`); }
+  try { candidates = await allItems(client, `/search?query=${conversationQuery(sender)}&scope=all&type=Channel&sort=created_at_asc`); }
   catch (error) {
     if (!(error instanceof ArenaError) || error.status !== 403) throw error;
     candidates = await allItems(client, `/users/${sender.id}/contents?type=Channel&sort=created_at_asc`);

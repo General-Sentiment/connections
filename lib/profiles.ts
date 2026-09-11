@@ -39,22 +39,23 @@ export async function readProfile(channelId: string | number, client = new Arena
   return assembleProfile(channel, contents.data.filter(item => item.visibility !== "private" && item.state === "available"), person);
 }
 export async function recentPublic(user: number, type: "Block" | "Channel") {
-  const client = new ArenaClient();
+  const client = new ArenaClient(undefined, false);
   const items: Item[] = [];
   let page: number | null = 1;
   // Profile text and description blocks can fill the first page. Keep looking
-  // for public creations so both recent grids can contain four items.
+  // for public items so both recent grids can contain four items.
   for (let attempt = 0; page && attempt < 3 && items.length < 4; attempt++) {
-    const result = await client.userContents(user, type, page, 24);
+    const result = await client.userContents(user, type, page, 24, "updated_at_desc");
     for (const item of result.data) {
       if (item.state !== "available" || item.visibility === "private" || item.metadata?.app === "connections" || item.title?.startsWith("Connection:")) continue;
       if (item.type === "Channel" ? item.owner?.type !== "User" || item.owner.id !== user : item.user?.id !== user) continue;
       if (!items.some(existing => existing.id === item.id)) items.push(item);
-      if (items.length === 4) break;
     }
     page = result.meta.next_page && result.meta.next_page > page ? result.meta.next_page : null;
   }
-  return items;
+  // The API selects pages by date but can return each page out of order.
+  // Rank every eligible item in the batch before choosing the visible four.
+  return items.sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at) || b.id - a.id).slice(0, 4);
 }
 export async function verifySelection(client: ArenaClient, person: Person, refs: { id: number; type: "Block" | "Channel" }[]) {
   const items = await Promise.all(refs.map(x => client.item(x.type, x.id)));

@@ -14,8 +14,8 @@ export class ArenaClient {
   contents(channel: string | number, page = 1, per = 24, sort = "position_asc") {
     return this.request<Page<Item>>(`/channels/${encodeURIComponent(channel)}/contents?page=${page}&per=${per}&sort=${sort}`);
   }
-  userContents(id: number, type: "Block" | "Channel", page = 1, per = 24) {
-    return this.request<Page<Item>>(`/users/${id}/contents?type=${type}&page=${page}&per=${per}&sort=created_at_desc`);
+  userContents(id: number, type: "Block" | "Channel", page = 1, per = 24, sort: "created_at_desc" | "updated_at_desc" = "created_at_desc") {
+    return this.request<Page<Item>>(`/users/${id}/contents?type=${type}&page=${page}&per=${per}&sort=${sort}`);
   }
   createChannel(title: string, options: { owner?: { id: number; type: "Group" | "User" }; visibility?: string; metadata?: Metadata } = {}) {
     return this.request<Item>("/channels", { method: "POST", body: { title, visibility: "closed", ...options } });
