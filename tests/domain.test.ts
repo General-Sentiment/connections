@@ -22,8 +22,9 @@ describe("details storage", () => {
     expect(() => parseDetails(encoded.repeat(2))).toThrow();
   });
   it("requires exactly three unique typed selections and at least one intention", () => {
-    const input = { whoAreYou: "An artist in Paris.", lookingFor: "A conversation", details, selected: [{ id: 1, type: "Block" }, { id: 1, type: "Channel" }, { id: 2, type: "Block" }] };
+    const input = { whoAreYou: "An artist in Paris.", lookingFor: "A conversation", details, selected: [{ id: 1, type: "Block" }, { id: 3, type: "Block" }, { id: 2, type: "Block" }] };
     expect(profileInputSchema.safeParse(input).success).toBe(true);
+    expect(profileInputSchema.safeParse({ ...input, selected: [{ id: 1, type: "Channel" }, ...input.selected.slice(1)] }).success).toBe(true);
     expect(profileInputSchema.safeParse({ ...input, selected: input.selected.slice(1) }).success).toBe(false);
     expect(profileInputSchema.safeParse({ ...input, selected: [input.selected[0], input.selected[0], input.selected[2]] }).success).toBe(false);
     expect(profileInputSchema.safeParse({ ...input, details: { ...details, open_to: [] } }).success).toBe(false);

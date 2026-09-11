@@ -17,3 +17,10 @@ export function parseArenaUrl(value: string): { type: "Block" | "Channel"; id: s
   throw new Error("This is not an Are.na block or channel link.");
 }
 export const itemKey = (item: Pick<Item, "type" | "id">) => `${item.type === "Channel" ? "Channel" : "Block"}:${item.id}`;
+
+export function pastedArenaUrl(value: string): string | undefined {
+  const text = value.trim();
+  if (/^(?:www\.)?are\.na\//i.test(text)) return `https://${text}`;
+  if (/^https?:\/\//i.test(text)) return text.replace(/^http:/i, "https:");
+  return undefined;
+}

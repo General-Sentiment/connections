@@ -19,7 +19,7 @@ export async function arenaRequest<T>(path: string, token: string | undefined, o
   const cached = cacheable ? state.cache.get(key) : undefined;
   if (cached && cached.expires > Date.now()) return structuredClone(cached.value) as T;
   if (cached) state.cache.delete(key);
-  const pendingKey = `${key}:${cachePublic}`;
+  const pendingKey = `${key}:${cachePublic}:${state.generation}`;
   if (read && state.pending.has(pendingKey)) return structuredClone(await state.pending.get(pendingKey)) as T;
   const run = async () => {
     const release = await slot();

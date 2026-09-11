@@ -1,3 +1,4 @@
+import { profilePrompts } from "./prompts";
 import { locationMetadata, locationSchema } from "./locations";
 import { ArenaClient, ArenaError } from "./arena";
 import { blankDetails, parseDetails, profileInputSchema, serializeDetails } from "./details";
@@ -28,15 +29,21 @@ export function assembleProfile(channel: Item, items: Item[], person: Person): P
   }
   const managed = new Set([details?.id, biography?.id, description?.id, link?.id, photo?.id]);
   const orderedItems = channel.metadata?.display_order === "position_desc" ? [...items].sort((a, b) => (b.connection?.position || 0) - (a.connection?.position || 0)) : items;
-  const selected = orderedItems.filter(x => roleOf(x) === "selected" || (!roleOf(x) && !managed.has(x.id))).slice(0, 3);
+  const selected = orderedItems.filter(x => roleOf(x) === "selected" || (!roleOf(x) && !managed.has(x.id)));
+  for (const prompt of Object.values(parsed.selected_prompts || {})) {
+    const author = items.find(item => roleOf(item) === "selected_prompt" && item.id === prompt.id)?.user;
+    if (author?.name && author.slug) prompt.author = { name: author.name, slug: author.slug };
+  }
   const selectedDescriptions = Object.fromEntries(items.filter(x => x.type === "Text" && roleOf(x) === "selected_description").map(x => [descriptionRef(x), x.content?.markdown || ""]));
   return { selectedDescriptions, channel, person, whoAreYou: biography?.content?.markdown || "", biographyBlock: biography, lookingFor: description?.content?.markdown || "", details: parsed, selected, photo, profileLink: link, descriptionBlock: description, detailsBlock: details, warning };
 }
-export async function readProfile(channelId: string | number, client = new ArenaClient()): Promise<Profile> {
-  const [channel, contents] = await Promise.all([client.item("Channel", channelId), client.contents(channelId, 1, 24)]);
+export async function readProfile(channelId: string | number, client = new ArenaClient(), knownChannel?: Item): Promise<Profile> {
+  const [channel, contents] = await Promise.all([knownChannel || client.item("Channel", channelId), allItems(client, `/channels/${channelId}/contents`)]);
   if (channel.visibility === "private" || channel.metadata?.app !== "connections" || !channel.metadata?.profile_user_id) throw new Error("This is not a published Connections profile.");
-  const person = await client.user(Number(channel.metadata.profile_user_id));
-  return assembleProfile(channel, contents.data.filter(item => item.visibility !== "private" && item.state === "available"), person);
+  const userId = Number(channel.metadata.profile_user_id);
+  const embeddedPerson = contents.flatMap(item => [item.user, item.connection?.connected_by]).find(person => person?.type === "User" && person.id === userId && person.name && person.slug && person.avatar);
+  const person = embeddedPerson || await client.user(userId);
+  return assembleProfile(channel, contents.filter(item => item.visibility !== "private" && item.state === "available"), person);
 }
 export async function recentPublic(user: number, type: "Block" | "Channel") {
   const client = new ArenaClient(undefined, false);
@@ -60,8 +67,6 @@ export async function recentPublic(user: number, type: "Block" | "Channel") {
 export async function verifySelection(client: ArenaClient, person: Person, refs: { id: number; type: "Block" | "Channel" }[]) {
   const items = await Promise.all(refs.map(x => client.item(x.type, x.id)));
   for (const item of items) {
-    const owner = item.type === "Channel" ? item.owner : item.user;
-    if (!owner || owner.type !== "User" || owner.id !== person.id) throw new Error("Choose blocks and channels created by your account.");
     if (item.visibility === "private" || item.state !== "available") throw new Error("Choose publicly visible, available items for your profile.");
     if (item.metadata?.app === "connections" || item.title?.startsWith("Connection:")) throw new Error("Choose your own collections rather than a profile or conversation.");
   }
@@ -101,6 +106,17 @@ export async function saveProfile(person: Person, token: string, raw: unknown) {
   if (!groupId()) throw new Error("The directory has not been configured yet.");
   return withLock(`profile:${person.id}`, async () => {
     const verifiedSelections = await verifySelection(client, person, input.selected);
+    const requestedPrompts = input.selected.flatMap(item => item.prompt ? [item.prompt] : []);
+    if (requestedPrompts.length) {
+      const catalog = await profilePrompts();
+      const priorRef = await availableProfileRef(person.id, client);
+      const priorPrompts = priorRef ? Object.values((await readProfile(priorRef.channel_id, client)).details.selected_prompts || {}) : [];
+      for (const prompt of requestedPrompts) {
+        const canonical = [...catalog, ...priorPrompts].find(candidate => candidate.id === prompt.id && candidate.text === prompt.text);
+        if (!canonical) throw new Error("A selected prompt has changed. Remix it and try again.");
+        prompt.author = canonical.author;
+      }
+    }
     const manager = await directoryClient(token);
     const group = await manager.request<{ can?: { manage_members?: boolean } }>(`/groups/${groupId()}`);
     if (!group.can?.manage_members) throw new Error("The directory's account needs to reconnect Are.na before profiles can be published.");
@@ -123,9 +139,7 @@ export async function saveProfile(person: Person, token: string, raw: unknown) {
       if (!memberChannel.can?.add_to) throw new Error("Are.na has not granted you access to your profile channel yet. Try again shortly.");
     }
     // Re-read after each retry; successfully created blocks keep their connection roles.
-    const contents = await client.contents(channel.id, 1, 100);
-    if (contents.meta.has_more_pages) throw new Error("This profile has too many items to edit safely. Remove unrelated items on Are.na first.");
-    const items = contents.data;
+    const items = await allItems(client, `/channels/${channel.id}/contents`);
     const upsert = async (role: string, title: string, value: string) => {
       const existing = items.find(x => roleOf(x) === role || (role === "details" && x.type === "Text" && x.title === "details"));
       if (!existing) return client.createBlock(channel.id, title, value, role);
@@ -135,12 +149,16 @@ export async function saveProfile(person: Person, token: string, raw: unknown) {
     for (const item of items) if (roleOf(item) === "profile_link" && item.connection) await client.disconnect(item.connection.id);
     await upsert("biography", "Who are you?", input.whoAreYou);
     await upsert("description", "What you’re looking for", input.lookingFor);
-    await upsert("details", "details", serializeDetails(input.details));
+    await upsert("details", "details", serializeDetails({ ...input.details, selected_prompts: Object.fromEntries(input.selected.filter(item => item.prompt).map(item => [`${item.type}:${item.id}`, item.prompt!])) }));
     await savePhoto(client, person, channel.id, input, items);
+    const oldPrompts = items.filter(x => roleOf(x) === "selected_prompt");
     const oldSelections = items.filter(x => roleOf(x) === "selected");
     const oldDescriptions = items.filter(x => roleOf(x) === "selected_description");
     for (let i = 0; i < input.selected.length; i++) {
       const selected = input.selected[i]; const key = `${selected.type}:${selected.id}`;
+      if (selected.prompt && !oldPrompts.some(item => item.id === selected.prompt!.id)) {
+        await client.connect(channel.id, { id: selected.prompt.id, type: "Block" }, { role: "selected_prompt", app: "connections" });
+      }
       const existing = oldSelections.find(x => itemKey(x) === key);
       if (!existing) await client.connect(channel.id, selected, { role: "selected", app: "connections" });
       const description = oldDescriptions.find(x => descriptionRef(x) === key);
@@ -152,16 +170,16 @@ export async function saveProfile(person: Person, token: string, raw: unknown) {
         } else await client.createBlock(channel.id, title, selected.description, "selected_description", { selected_type: selected.type, selected_id: selected.id });
       }
     }
+    for (const previous of oldPrompts) if (!input.selected.some(item => item.prompt?.id === previous.id) && previous.connection) await client.disconnect(previous.connection.id);
     for (const previous of oldSelections) if (!input.selected.some(x => `${x.type}:${x.id}` === itemKey(previous)) && previous.connection) await client.disconnect(previous.connection.id);
     for (const previous of oldDescriptions) if (!input.selected.some(x => `${x.type}:${x.id}` === descriptionRef(previous) && x.description) && previous.connection) await client.disconnect(previous.connection.id);
     // Are.na displays highest positions first. Move the reversed display
     // sequence to the top, keeping each original followed by its description.
-    const arranged = await client.contents(channel.id, 1, 100);
-    if (arranged.meta.has_more_pages) throw new Error("This profile has too many items to order safely.");
-    const displayOrder = ["photo", "biography", "description", "details"].map(role => arranged.data.find(item => roleOf(item) === role));
+    const arranged = await allItems(client, `/channels/${channel.id}/contents`);
+    const displayOrder = ["biography", "description", "photo", "details"].map(role => arranged.find(item => roleOf(item) === role));
     for (const selected of input.selected) {
       const key = `${selected.type}:${selected.id}`;
-      displayOrder.push(arranged.data.find(item => roleOf(item) === "selected" && itemKey(item) === key), arranged.data.find(item => roleOf(item) === "selected_description" && descriptionRef(item) === key));
+      displayOrder.push(selected.prompt ? arranged.find(item => roleOf(item) === "selected_prompt" && item.id === selected.prompt!.id) : undefined, arranged.find(item => roleOf(item) === "selected" && itemKey(item) === key), arranged.find(item => roleOf(item) === "selected_description" && descriptionRef(item) === key));
     }
     for (const item of displayOrder.reverse()) if (item?.connection) await client.request(`/connections/${item.connection.id}/move`, { method: "POST", body: { movement: "move_to_top" } });
     await (userOwned ? client : manager).updateChannel(channel.id, { title: person.name, description: `https://www.are.na/${person.slug}`, metadata: { published: true, display_order: "position_desc", ...locationMetadata(input.details.location) } });

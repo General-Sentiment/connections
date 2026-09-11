@@ -57,3 +57,21 @@ it("refreshes external edits after one minute and subtracts upstream cache age",
   await client.item("Block", 2); now += 1001; await client.item("Block", 2);
   expect(fetcher).toHaveBeenCalledTimes(4);
 });
+
+it("does not reuse an in-flight read started before a write", async () => {
+  let finishOld!: (response: Response) => void;
+  const fetcher = vi.fn()
+    .mockImplementationOnce(() => new Promise<Response>(resolve => { finishOld = resolve; }))
+    .mockResolvedValueOnce(json({ id: 1 }))
+    .mockResolvedValueOnce(json({ id: 1, title: "New" }));
+  vi.stubGlobal("fetch", fetcher);
+  const client = new ArenaClient();
+  const old = client.item("Block", 1);
+  await vi.waitFor(() => expect(finishOld).toBeDefined());
+  await new ArenaClient("author").updateBlock(1, { title: "New" });
+  expect((await client.item("Block", 1)).title).toBe("New");
+  finishOld(json({ id: 1, title: "Old" }));
+  await old;
+  expect((await client.item("Block", 1)).title).toBe("New");
+  expect(fetcher).toHaveBeenCalledTimes(3);
+});

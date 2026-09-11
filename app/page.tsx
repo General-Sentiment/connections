@@ -15,7 +15,8 @@ import { readProfile, availableProfileRef } from "@/lib/profiles";
 import { Card } from "@/components/card";
 import { demoProfiles } from "@/lib/demo";
 import { isDemo, groupId, aboutBlockId } from "@/lib/config";
-import { ArenaClient } from "@/lib/arena";
+import { RefreshProfile } from "@/components/refresh-profile";
+import { ArenaClient, ArenaError } from "@/lib/arena";
 import { getSession } from "@/lib/session";
 import { randomInt } from "node:crypto";
 import { directoryClient } from "@/lib/directory-auth";
@@ -66,19 +67,20 @@ export default async function Directory({ searchParams }: { searchParams: Promis
   if (about) items.unshift(about);
   let entries = await Promise.all(items.map(async item => {
     if (item.type !== "Channel") return { item };
-    try { return { item, profile: demo ? demoProfiles.find(p => p.channel.id === item.id) : await readProfile(item.id) }; }
-    catch { return { item }; }
+    try { return { item, profile: demo ? demoProfiles.find(p => p.channel.id === item.id) : await readProfile(item.id, new ArenaClient(), item) }; }
+    catch (error) { return { item, unavailable: error instanceof ArenaError && error.status === 404 }; }
   }));
+  entries = entries.filter(entry => !("unavailable" in entry && entry.unavailable));
   if (filter) {
     const matching = entries.filter(entry => entry.profile?.details.open_to.includes(filter));
     next = matching.length > page * 8 ? page + 1 : null;
     entries = matching.slice((page - 1) * 8, page * 8);
   }
-  return <div className="page directory-page homepage"><DirectoryHeader active="profiles" />
+  return <div className="page directory-page homepage"><RefreshProfile /><DirectoryHeader active="profiles" hasProfile={Boolean(existingProfile)} />
     <MobileDirectoryControls><div className="info-grid"><section><h2 className="info-title">View</h2><DirectoryView view={view} /></section><section><h2 className="info-title">Order</h2><DirectoryOrder order={order} seed={seed} /></section><section><h2 className="info-title">Open to</h2><DirectoryFilter value={filter || "all"} /></section><section><h2 className="info-title">Location</h2><DirectoryLocation locations={locations} country={country} city={city} /></section></div></MobileDirectoryControls>
     {query.error && <p className="notice error" role="alert">{query.error}</p>}{error && <p className="notice error" role="alert">{error}</p>}
     {!demo && !groupId() && <div className="notice"><p>The directory is being set up.</p><Link href="/setup">Continue setup →</Link></div>}
-    {view === "table" ? <ProfileTable entries={entries} /> : <div className="grid">{!existingProfile?.published && <Link className="add-square add-yourself-tile" href="/profile/edit"><span aria-hidden>＋</span><span>Add Yourself</span></Link>}{about && <Card item={about} />}{entries.filter(entry => entry.item.type === "Channel").map(({ item, profile }) => <ProfileCard key={item.id} item={item} profile={profile} />)}</div>}
+    {view === "table" ? <ProfileTable entries={entries} /> : <div className="grid">{!existingProfile?.published && <Link className="add-square add-yourself-tile" href="/profile/edit"><span aria-hidden>＋</span><span className="add-yourself-label">Add Yourself</span></Link>}{about && <Card item={about} />}{entries.filter(entry => entry.item.type === "Channel").map(({ item, profile }) => <ProfileCard key={item.id} item={item} profile={profile} />)}</div>}
     {!error && hasFilter && !entries.length && <p className="empty">No profiles match these filters.</p>}
     <div className="footer-actions"><span>{page > 1 && <Link href={pageHref(page - 1)}>← Previous</Link>}</span>{next && <Link href={pageHref(next)}>Next →</Link>}</div>
     {demo && <p className="preview-note">Preview · Sample profiles. Nothing here has been published to Are.na. <Link href="/setup">Connect the live directory →</Link></p>}

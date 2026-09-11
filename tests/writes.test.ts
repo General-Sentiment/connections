@@ -17,6 +17,8 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (url: string, options: RequestInit = {}) => {
     const path = new URL(url).pathname + new URL(url).search; const method = options.method || "GET"; const body = options.body ? JSON.parse(String(options.body)) : undefined; calls.push({ path, method, body });
     const response = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
+    if (path.startsWith("/v3/channels/prompts-lkiimgy92_0/contents")) return response({ data: [...blocks.values()].filter(x => x.id >= 10 && x.id < 20), meta: { next_page: null } });
+    if (path === "/v3/users/101") return response(alice);
     if (path.startsWith("/v3/search")) return response({ data: channel.metadata?.role === "conversation" ? [channel] : [], meta: { next_page: null } });
     if (path === "/v3/channels" && method === "POST") { channel = { ...channel, title: body.title, visibility: body.visibility, owner: body.owner?.type === "Group" ? { type: "Group", id: body.owner.id, name: "Group", slug: "group" } : alice, collaborators: [], metadata: body.metadata }; return response(channel, 201); }
     if (path === "/v2/channels/100/collaborators") { channel.collaborators = [bob]; return response({ users: [bob] }); }
@@ -99,9 +101,9 @@ describe("profile writes", () => {
     expect(contents.filter(x => x.metadata?.role === "selected_description")).toHaveLength(2);
     expect(blocks.has(ids[1])).toBe(true); // Disconnecting does not delete the source block.
   });
-  it("rejects selections created by someone else before creating a profile", async () => {
-    vi.stubEnv("ARENA_GROUP_ID", "77"); vi.stubEnv("ARENA_PROFILES_CHANNEL", "999"); blocks.get(2)!.user = bob;
-    await expect(saveProfile(alice, "token", { whoAreYou: "An artist in Paris.", lookingFor: "Hello", details: { schema: "connections_profile", version: 1, location: { city: "Paris", country: "France" }, open_to: ["conversation"], local_only: false }, selected: [1, 2, 3].map(id => ({ id, type: "Block" })) })).rejects.toThrow("created by your account");
+  it("rejects private blocks before creating a profile", async () => {
+    vi.stubEnv("ARENA_GROUP_ID", "77"); vi.stubEnv("ARENA_PROFILES_CHANNEL", "999"); blocks.get(2)!.visibility = "private";
+    await expect(saveProfile(alice, "token", { whoAreYou: "An artist in Paris.", lookingFor: "Hello", details: { schema: "connections_profile", version: 1, location: { city: "Paris", country: "France" }, open_to: ["conversation"], local_only: false }, selected: [1, 2, 3].map(id => ({ id, type: "Block" })) })).rejects.toThrow("publicly visible");
     expect(calls.some(x => x.path === "/v3/channels" && x.method === "POST")).toBe(false);
   });
 });
@@ -160,4 +162,15 @@ describe("profile deletion", () => {
     await expect(deleteProfile(alice, "token", 100)).rejects.toThrow("your own profile");
     expect(calls.some(call => call.method === "DELETE")).toBe(false);
   });
+});
+
+it("connects original prompts before responses without duplicating them on retry", async () => {
+  vi.stubEnv("ARENA_GROUP_ID", "77"); vi.stubEnv("ARENA_PROFILES_CHANNEL", "999");
+  for (const id of [11, 12, 13]) blocks.set(id, { ...base, id, type: "Text", content: { plain: `Question ${id}`, markdown: `Question ${id}` } } as Item);
+  const input = { whoAreYou: "Artist", lookingFor: "Conversation", details: { schema: "connections_profile", version: 1, location: { city: "Paris", country: "France" }, open_to: ["conversation"], local_only: false }, selected: [1, 2, 3].map(id => ({ id, type: "Block", prompt: { id: id + 10, text: `Question ${id + 10}` } })) };
+  await saveProfile(alice, "token", input);
+  await saveProfile(alice, "token", input);
+  const pairs = [...contents].reverse().filter(x => ["selected", "selected_prompt"].includes(String(x.connection?.metadata?.role)));
+  expect(pairs.map(x => x.id)).toEqual([11, 1, 12, 2, 13, 3]);
+  expect(assembleProfile(channel, contents, alice).selected.map(x => x.id)).toEqual([1, 2, 3]);
 });

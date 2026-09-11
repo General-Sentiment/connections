@@ -1,0 +1,5 @@
+import { PromptAuthor } from "./prompt-author";
+import type { ProfilePrompt } from "@/lib/prompts";
+export function SelectionPrompt({ prompt, onRemix, onRemove, disabled = false }: { prompt?: ProfilePrompt; onRemix?: () => void; onRemove?: () => void; disabled?: boolean }) {
+  return <div className="selection-prompt"><p aria-live="polite">{prompt?.text || "Loading prompt…"}<PromptAuthor prompt={prompt} /></p><div className="prompt-actions">{onRemix && <button type="button" className="icon prompt-remix" onClick={onRemix} disabled={disabled} aria-label="Remix prompt" title="Choose another prompt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h3c5 0 7 12 12 12h3m-4-4 4 4-4 4M3 18h3c2 0 3.5-2 5-4.5M13 10.5C14.5 8 16 6 18 6h3m-4-4 4 4-4 4" /></svg></button>}{onRemove && <button type="button" className="icon" onClick={onRemove} aria-label="Remove selection" title="Remove selection">×</button>}</div></div>;
+}
