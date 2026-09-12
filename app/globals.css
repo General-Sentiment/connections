@@ -638,3 +638,4 @@ button.profile-primary:hover,a.button.profile-primary:hover{background:var(--fg)
 
 .profile-card,.add-yourself-tile,.prompt-catalog-square{text-decoration:none!important}
 @media(max-width:600px){.connections-page .grid,.grid.prompt-catalog{grid-template-columns:minmax(0,1fr)}}
+.window-toast{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:40;max-width:calc(100% - 32px);width:max-content;padding:12px 18px;background:var(--fg);color:var(--bg);border-radius:4px;font-size:14px;line-height:1.4;box-shadow:0 4px 20px #0002;pointer-events:none}
