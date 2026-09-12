@@ -1,3 +1,4 @@
+import { MobileDirectoryControls } from "@/components/mobile-directory-controls";
 import { randomInt } from "node:crypto";
 import ReactMarkdown from "react-markdown";
 import { ArenaClient } from "@/lib/arena";
@@ -29,7 +30,7 @@ export default async function PromptsPage({ searchParams }: { searchParams: Prom
     ? (Math.imul(a.id ^ seed, 2654435761) >>> 0) - (Math.imul(b.id ^ seed, 2654435761) >>> 0)
     : Date.parse((order === "updated" ? b.updatedAt : b.createdAt) || b.addedAt || "1970-01-01") - Date.parse((order === "updated" ? a.updatedAt : a.createdAt) || a.addedAt || "1970-01-01"));
   return <div className="page"><DirectoryHeader active="prompts" arenaHref={`https://www.are.na/channel/${encodeURIComponent(process.env.ARENA_PROMPTS_CHANNEL || "prompts-lkiimgy92_0")}`} />
-    <div className="info-grid"><section><h2 className="info-title">Info</h2><ReactMarkdown skipHtml>{description}</ReactMarkdown></section><section><h2 className="info-title">View</h2><DirectoryView view={view} /></section><section><h2 className="info-title">Order</h2><DirectoryOrder order={order} seed={seed} /></section></div>
+    <MobileDirectoryControls><div className="info-grid"><section><h2 className="info-title">Info</h2><ReactMarkdown skipHtml>{description}</ReactMarkdown></section><section><h2 className="info-title">View</h2><DirectoryView view={view} /></section><section><h2 className="info-title">Order</h2><DirectoryOrder order={order} seed={seed} /></section></div></MobileDirectoryControls>
     {error && <p className="notice error" role="alert">{error}</p>}
     <div className={view === "table" ? "prompt-catalog prompt-catalog-table" : "grid prompt-catalog"}><AddPrompt />{prompts.map(prompt => <article className="prompt-catalog-card" key={prompt.id}>
       <a className="prompt-catalog-square" href={`https://www.are.na/block/${prompt.id}`} target="_blank" rel="noopener noreferrer">{prompt.text}</a>

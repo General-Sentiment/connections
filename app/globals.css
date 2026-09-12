@@ -632,3 +632,6 @@ button.profile-primary:hover,a.button.profile-primary:hover{background:var(--fg)
   .picker-item.selected{border:2px solid Highlight}
 }
 .browser-window:focus{outline:none}
+@media(max-width:600px){.directory-heading h1{flex-direction:column;align-items:flex-start;gap:6px}.directory-heading h1>.slash{display:none}}
+.text-tile,.table-about-text,.prompt-catalog-square{padding:16px}
+.prompt-catalog-table .prompt-catalog-square{padding:0}
