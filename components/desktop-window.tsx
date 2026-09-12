@@ -153,6 +153,7 @@ export function DesktopWindow({ children, logout }: { children: React.ReactNode;
       const root = document.documentElement;
       const dark = root.dataset.theme ? root.dataset.theme === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
       root.dataset.theme = dark ? "light" : "dark";
+      try { localStorage.setItem("connections:theme", root.dataset.theme); } catch { /* Keep the toggle usable when storage is unavailable. */ }
     }} />
     <div className="desktop-icons" hidden={open}>
     <a className="desktop-launcher" href="https://www.are.na/" target="_blank" rel="noopener noreferrer" aria-label="Open Are.na in a new tab">
