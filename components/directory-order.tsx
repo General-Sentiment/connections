@@ -3,7 +3,7 @@
 import { useOptimistic, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-const options = [["newest", "Newest"], ["updated", "Updated recently"], ["random", "Random"]] as const;
+const options = [["newest", "Newest"], ["random", "Random"], ["updated", "Updated recently"]] as const;
 type Order = typeof options[number][0];
 
 export function DirectoryOrder({ order, seed }: { order: Order; seed: number }) {

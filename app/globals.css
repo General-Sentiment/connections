@@ -643,5 +643,5 @@ button.profile-primary:hover,a.button.profile-primary:hover{background:var(--fg)
 :root[data-theme="dark"]{color-scheme:dark;--bg:#000;--fg:#e5e5e5;--muted:#b2b2b2;--dim:#aaa;--rule:#292929;--surface:#191919;--hover:#262626;--active:#393939;--border:#333;--border-strong:#555;--input-border:#777;--error:#f1a2a2;--public-border:#238a55;--public-text:#53b77d;--private-border:#755c89;--private-text:#b295cb;--backdrop:#000b}
 .text-tile{text-align:left}
 .picker-load-more{display:flex;justify-content:center;margin-top:40px;padding-bottom:16px}
-.picker-load-more button,.directory-pagination a.button{min-height:44px;padding:10px 24px;font-size:16px}
-.directory-pagination{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:12px}
+.picker-load-more button,.directory-pagination button{min-height:44px;padding:10px 24px;font-size:16px}
+.directory-pagination{justify-content:center}
