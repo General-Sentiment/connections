@@ -5,7 +5,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { DesktopWindow } from "@/components/desktop-window";
 import "./globals.css";
-export const metadata: Metadata = { title: { default: "Connections", template: "%s / Connections" }, description: "Meet people through their collections on Are.na." };
+export const metadata: Metadata = { metadataBase: new URL(process.env.APP_URL || "https://connections.forum"), title: { default: "Connections", template: "%s / Connections" }, description: "Meet people through their collections on Are.na.", twitter: { card: "summary_large_image" } };
 async function DesktopLogout() {
   const session = await getSession();
   return session?.token && session.person ? <form className="desktop-logout" action="/api/auth/logout" method="post"><button className="quiet" type="submit">Log out</button></form> : null;
