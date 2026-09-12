@@ -1,3 +1,4 @@
+import { DevProfile } from "@/components/dev-debug";
 import { logServerError } from "@/lib/logging";
 import { ProfileVisibility } from "@/components/profile-visibility";
 import { RecentProfileItems } from "@/components/recent-profile-items";
@@ -20,9 +21,11 @@ import { safeUrl, itemKey } from "@/lib/urls";
 import type { Item, Profile } from "@/lib/types";
 export const dynamic = "force-dynamic";
 export default async function PersonPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  if (/^sample-[1-6]$/.test(id)) return <DevProfile index={Number(id.slice(-1)) - 1} />;
   if (!await hasConnection()) return <Welcome />;
   const session = await getSession();
-  const { id } = await params; const demo = isDemo(); let profile: Profile; let blocks: Item[] = []; let channels: Item[] = []; let recentError = "";
+  const demo = isDemo(); let profile: Profile; let blocks: Item[] = []; let channels: Item[] = []; let recentError = "";
   if (demo) { const found = demoProfiles.find(p => String(p.channel.id) === id); if (!found) notFound(); profile = found; blocks = demoBlocks.slice(0, 4); channels = ["Public spaces", "Loose observations", "Printed matter", "Everyday objects"].map((title, i) => demoChannel(710000 + i, title, found.person, 20 + i)); }
   else { try { profile = await readProfile(id, new ArenaClient(session?.token)); } catch (e) { logServerError(e, { event: "page.load_failed", route: "/people/[id]", method: "GET" }); return <div className="page"><Header title="Profile" /><p className="notice error">{e instanceof Error ? e.message : "This profile is unavailable."}</p></div>; } const results = await Promise.allSettled([recentPublic(profile.person.id, "Block"), recentPublic(profile.person.id, "Channel")]); if (results[0].status === "fulfilled") blocks = results[0].value; if (results[1].status === "fulfilled") channels = results[1].value; if (results.some(r => r.status === "rejected")) recentError = "Recent items could not be loaded from Are.na. Try again shortly."; }
   const formatDate = (value: string) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }); };

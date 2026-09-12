@@ -601,7 +601,7 @@ button.profile-primary:hover,a.button.profile-primary:hover{background:var(--fg)
 
 .profile-editor:not(.profile-wizard) .selected-slot + .selected-slot{position:relative}
 .profile-editor:not(.profile-wizard) .selected-slot + .selected-slot::before{content:"";position:absolute;top:-68px;left:0;right:0;border-top:1px solid var(--rule)}
-.about-card .text-tile{font-size:1rem;line-height:1.4}
+.about-card .text-tile,.featured-profile-items .text-tile{font-size:1rem;line-height:1.4}
 .prompt-catalog-table{display:flex;flex-direction:column;gap:24px}
 .prompt-catalog-table .prompt-catalog-card{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:24px;border-top:1px solid var(--rule);padding-top:24px}
 .prompt-catalog-table .prompt-catalog-square{aspect-ratio:auto;min-height:0;border:0;padding:0}
