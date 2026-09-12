@@ -641,5 +641,4 @@ button.profile-primary:hover,a.button.profile-primary:hover{background:var(--fg)
 .window-toast{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:40;max-width:calc(100% - 32px);width:max-content;padding:12px 18px;background:var(--fg);color:var(--bg);border-radius:4px;font-size:14px;line-height:1.4;box-shadow:0 4px 20px #0002;pointer-events:none}
 
 :root[data-theme="dark"]{color-scheme:dark;--bg:#000;--fg:#e5e5e5;--muted:#b2b2b2;--dim:#aaa;--rule:#292929;--surface:#191919;--hover:#262626;--active:#393939;--border:#333;--border-strong:#555;--input-border:#777;--error:#f1a2a2;--public-border:#238a55;--public-text:#53b77d;--private-border:#755c89;--private-text:#b295cb;--backdrop:#000b}
-button.corner-theme-toggle{position:fixed;bottom:0;left:0;width:28px;height:28px;min-height:28px;padding:0;border:0;background:transparent;z-index:100;border-radius:0}
-button.corner-theme-toggle:hover{background:transparent}
+.text-tile{text-align:left}
