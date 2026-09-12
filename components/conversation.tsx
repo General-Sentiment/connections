@@ -82,6 +82,6 @@ export function Conversation({ channelId, recipient, self, initialMessages = [],
     <form aria-busy={busy} className="composer" onSubmit={e => { e.preventDefault(); void send(); }}><fieldset disabled={busy} className="form-fieldset">
       <textarea ref={messageInput} rows={1} aria-label="Private Message" placeholder="Private Message" maxLength={10000} value={text} onChange={e => changeText(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) { e.preventDefault(); void send(); } }} />
       <button className="composer-send" type="submit" aria-label={busy ? "Sending message" : "Send message"} disabled={busy || !text.trim()}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6" /></svg></button>
-    </fieldset>{error && <p role="alert" className="error small">{error}</p>}</form>{demo && <p className="preview-note">Sample conversation · Messages are not sent.</p>}
+    </fieldset>{error && <p role="alert" className="error small">{error}</p>}</form>
   </div>;
 }

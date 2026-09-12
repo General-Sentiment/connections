@@ -133,3 +133,8 @@ export function DevProfile({ index }: { index: number }) {
     <div className="featured-profile-items">{answers.map((answer, i) => <section key={answer}><p className="profile-selection-prompt">{["What is something you treasure?", "What will you never be too old to enjoy?", "Where should we begin?"][i]}</p>{i === 1 ? <div className="card-square channel-tile public"><div className="channel-inner"><div className="channel-title">{sampleChannelTitles[index]}</div><div className="channel-meta"><strong>by {name}</strong><br />{8 + index * 3} blocks</div></div></div> : i === 0 ? <div className="card-square"><img src={responseImages[index]} alt="" loading="lazy" /></div> : <div className="card-square text-block"><div className="text-tile">{answer}</div></div>}{i < 2 && <p className="featured-description">{answer}</p>}</section>)}</div>
   </div>;
 }
+
+export function SampleAwareProfileHeader(props: React.ComponentProps<typeof Header>) {
+  const { enabled } = useDevDebug();
+  return <Header {...props} title={enabled ? "Casey Morgan" : props.title} titleHref={enabled ? undefined : props.titleHref} />;
+}
