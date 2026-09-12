@@ -50,9 +50,12 @@ export default async function Directory({ searchParams }: { searchParams: Promis
     const path = order === "random" ? `/search?query=*&group_id=${groupId()}&type=Channel&sort=random&seed=${seed}` : `/groups/${groupId()}/contents?type=Channel&sort=${order === "updated" ? "updated_at_desc" : "created_at_desc"}`;
     items = (await allItems(client, path)).filter(x => x.type === "Channel" && x.visibility !== "private" && x.owner?.type === "Group" && x.owner.id === groupId() && x.metadata?.app === "connections" && x.metadata?.published === true && x.metadata?.hidden !== true);
   } catch (e) { logServerError(e, { event: "page.load_failed", route: "/", method: "GET" }); error = e instanceof Error ? e.message : "The directory could not be loaded."; } }
-  if (demo) {
-    if (order === "random") items.sort((a, b) => ((Math.imul(a.id ^ seed, 2654435761) >>> 0) - (Math.imul(b.id ^ seed, 2654435761) >>> 0)));
-    else items.sort((a, b) => Date.parse(order === "updated" ? b.updated_at : b.created_at) - Date.parse(order === "updated" ? a.updated_at : a.created_at));
+  if (order === "random") {
+    if (demo) items.sort((a, b) => ((Math.imul(a.id ^ seed, 2654435761) >>> 0) - (Math.imul(b.id ^ seed, 2654435761) >>> 0)));
+  } else {
+    // Are.na can return ascending results despite a descending sort request.
+    // Sort the full directory before filtering and pagination.
+    items.sort((a, b) => Date.parse(order === "updated" ? b.updated_at : b.created_at) - Date.parse(order === "updated" ? a.updated_at : a.created_at) || b.id - a.id);
   }
   locations = [...new Map(items.flatMap(item => {
     const m = item.metadata;
@@ -86,7 +89,7 @@ export default async function Directory({ searchParams }: { searchParams: Promis
     {!demo && !groupId() && <div className="notice"><p>The directory is being set up.</p><Link href="/setup">Continue setup →</Link></div>}
     {view === "table" ? <ProfileTable entries={entries.filter(entry => entry.item.type === "Channel")} /> : <div className="grid">{!existingProfile?.published && <Link className="add-square add-yourself-tile" href="/profile/edit"><span aria-hidden>＋</span><span className="add-yourself-label">Add Yourself</span></Link>}{about && <div className="about-card"><Card item={about} caption="Info" /></div>}{entries.filter(entry => entry.item.type === "Channel").map(({ item, profile }) => <ProfileCard key={item.id} item={item} profile={profile} />)}</div>}
     {!error && hasFilter && !entries.length && <p className="empty">No profiles match these filters.</p>}
-    <div className="footer-actions"><span>{page > 1 && <Link href={pageHref(page - 1)}>← Previous</Link>}</span>{next && <Link href={pageHref(next)}>Next →</Link>}</div>
+    <div className="footer-actions directory-pagination"><span>{page > 1 && <Link href={pageHref(page - 1)}>← Previous</Link>}</span>{next && <Link className="button" href={pageHref(next)}>Load more</Link>}</div>
     </DevListing>{demo && <p className="preview-note">Preview · Sample profiles. Nothing here has been published to Are.na. <Link href="/setup">Connect the live directory →</Link></p>}
   </div>;
 }
