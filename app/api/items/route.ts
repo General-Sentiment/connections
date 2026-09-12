@@ -34,5 +34,5 @@ export async function GET(request: NextRequest) {
     }
     result.data = result.data.filter(x => x.visibility !== "private" && x.state === "available" && x.metadata?.app !== "connections" && (x.type === "Channel" ? x.owner?.type === "User" && x.owner.id === session.person.id : x.user?.id === session.person.id));
     return privateJson({ ...result, scope });
-  } catch (e) { return apiError(e); }
+  } catch (e) { return apiError(e, { route: "/api/items", method: "GET" }); }
 }

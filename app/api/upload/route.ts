@@ -12,5 +12,5 @@ export async function POST(request: NextRequest) {
     const file = response.files[0]; if (!file) throw new Error("Are.na did not return an upload URL.");
     const proof = await sealData({ key: file.key, userId: session.person.id, expires: Date.now() + 3600000 }, { password: process.env.SESSION_SECRET!, ttl: 3600 });
     return privateJson({ ...file, proof });
-  } catch (e) { return apiError(e); }
+  } catch (e) { return apiError(e, { route: "/api/upload", method: "POST" }); }
 }

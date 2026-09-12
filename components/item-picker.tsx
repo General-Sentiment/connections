@@ -1,4 +1,5 @@
 "use client";
+import { usePickerDialog } from "./use-picker-dialog";
 import { useEffect, useRef, useState } from "react";
 import type { Item } from "@/lib/types";
 import type { ProfilePrompt } from "@/lib/prompts";
@@ -11,27 +12,7 @@ export function ItemPicker({ selected, onChange, onClose, onReplace, prompt, onR
   const [type, setType] = useState<"Block" | "Channel">("Block"); const [q, setQ] = useState("");
   const [trail, setTrail] = useState<Item[]>([]); const channel = trail.at(-1);
   const [items, setItems] = useState<Item[]>([]); const [page, setPage] = useState(1); const [next, setNext] = useState<number | null>(null); const [scope, setScope] = useState(""); const [busy, setBusy] = useState(true); const [error, setError] = useState("");
-  useEffect(() => {
-    const modal = dialog.current;
-    if (!modal) return;
-    modal.showModal();
-    const viewport = modal.closest(".window-viewport");
-    const center = () => {
-      if (!viewport) return;
-      modal.style.transform = "none";
-      const bounds = viewport.getBoundingClientRect();
-      const rect = modal.getBoundingClientRect();
-      const scale = rect.height / modal.offsetHeight || 1;
-      const offset = bounds.top + (bounds.height - rect.height) / 2 - rect.top;
-      modal.style.transform = `translateY(${offset / scale}px)`;
-    };
-    center();
-    const observer = new ResizeObserver(center);
-    if (viewport) observer.observe(viewport);
-    observer.observe(modal);
-    window.addEventListener("resize", center);
-    return () => { observer.disconnect(); window.removeEventListener("resize", center); modal.close(); };
-  }, []);
+  usePickerDialog(dialog);
   useEffect(() => {
     const controller = new AbortController(); setBusy(true); setError("");
     const timer = setTimeout(async () => { try {
@@ -50,6 +31,7 @@ export function ItemPicker({ selected, onChange, onClose, onReplace, prompt, onR
     <SelectionPrompt prompt={prompt} onRemix={onRemix} onClose={onClose} disabled={remixDisabled} />
     <div className="picker-search-row"><input autoFocus className="search-input" aria-label={channel ? "Search this channel" : "Search your blocks and channels"} placeholder={channel ? "Search this channel or paste an Are.na URL" : "Search by name or paste an Are.na URL"} value={q} onChange={e => { setBusy(true); setQ(e.target.value); setPage(1); }} /><div className="picker-toggle" role="group" aria-label="Content type">{(["Block", "Channel"] as const).map(t => <button key={t} type="button" className={type === t && !channel ? "active" : undefined} aria-pressed={type === t && !channel} onClick={() => { setType(t); navigate([]); }}>{t}s</button>)}</div></div>
     {channel && <div className="picker-channel-nav"><button type="button" className="quiet" onClick={() => navigate(trail.slice(0, -1))}>← Back</button><span>{channel.title || "Untitled channel"}</span></div>}
+    <p className="sr-only" role="status">{busy ? "Loading items…" : error ? "Items could not be loaded." : `${items.length} items available.`}</p>
     <div className="picker-results" aria-busy={busy}>{busy ? <div className="picker-loading" role="status" aria-label="Loading"><span className="loading-spinner" aria-hidden /></div> : <>{scope && <p className="small muted" aria-live="polite">{scope}</p>}{error && <p className="error" role="alert">{error}</p>}<div className="picker-grid">{items.map(item => {
       const checked = selected.some(x => itemKey(x) === itemKey(item));
       return <button key={itemKey(item)} type="button" className={`picker-item ${checked ? "selected" : ""}`} aria-pressed={checked} aria-label={`${checked ? "Selected" : "Select"} ${item.title || "Untitled"}`} disabled={Boolean(onReplace && checked)} onClick={() => { if (onReplace) onReplace(item); else onChange(checked ? selected.filter(x => itemKey(x) !== itemKey(item)) : [...selected, item]); }}><CardFace item={item} /><span className="picker-title">{item.title || "Untitled"}</span>{checked && <span className="selection-mark">✓</span>}</button>;

@@ -6,6 +6,8 @@ import { getSession } from "@/lib/session";
 import { DevCheck } from "@/components/dev-check";
 import { SetupForm } from "@/components/setup-form";
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Set up Connections" };
+
 export default async function Setup() {
   if (!await hasConnection()) return <Welcome />;
   const session = await getSession();

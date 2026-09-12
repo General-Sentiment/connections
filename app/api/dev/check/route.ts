@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       results.twoIndividualParticipants = members.length === 2 && members.some(x => x.id === session.person.id) && members.some(x => x.id === tester.id);
       results.directoryGroupExcluded = shared.owner?.type === "User" && shared.collaborators?.every(x => x.type === "User");
     }
-  } catch (e) { return apiError(e); }
+  } catch (e) { return apiError(e, { route: "/api/dev/check", method: "POST" }); }
   finally { if (client && channelId) { try { await client.request(`/channels/${channelId}`, { method: "DELETE" }); results.cleanup = true; } catch { results.cleanup = false; results.remainingTestChannel = channelId; } } }
   return privateJson(results);
 }

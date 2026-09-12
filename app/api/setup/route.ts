@@ -13,5 +13,5 @@ export async function POST(request: NextRequest) {
     const group = await client.request<{ user: { id: number } }>(`/groups/${groupId()}`);
     if (group.user.id !== session.person.id) throw new ArenaError(403, "Only the group owner can check setup.");
     return privateJson({ configured: true });
-  } catch (error) { return apiError(error); }
+  } catch (error) { return apiError(error, { route: "/api/setup", method: "POST" }); }
 }

@@ -1,3 +1,4 @@
+import { AccountConnectionCount } from "./dev-debug";
 import Link from "./app-link";
 import { getSession } from "@/lib/session";
 import { ArenaClient } from "@/lib/arena";
@@ -17,7 +18,7 @@ export async function AccountBar() {
     <Link href="/" className="account-home" aria-label="Connections home"><svg width="36" height="24" viewBox="0 0 54 36" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true"><circle cx="17" cy="18" r="14" /><circle cx="37" cy="18" r="14" /></svg></Link>
     <div className="account-bar-actions">
       <Link href="/profile/edit" className={`button${profile.status === "fulfilled" && !hasProfile ? " profile-primary" : ""}`}>{label}{profile.status === "fulfilled" && !hasProfile && <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" aria-hidden="true"><path d="M12 3v18M3 12h18" /></svg>}</Link>
-      <Link href="/connections" className="button account-count" aria-label={connections.status === "fulfilled" ? `${connections.value.length} connections` : "View connections"}>{connections.status === "fulfilled" ? connections.value.length : "—"}</Link>
+      <AccountConnectionCount realCount={connections.status === "fulfilled" ? connections.value.length : null} />
       <a className="account-avatar" href={`https://www.are.na/${encodeURIComponent(person.slug)}`} target="_blank" rel="noopener noreferrer" aria-label={`${person.name} on Are.na`}>{avatar ? <img src={avatar} alt="" /> : <span>{person.name.slice(0, 1)}</span>}</a>
     </div>
   </nav>;

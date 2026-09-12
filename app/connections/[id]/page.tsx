@@ -1,3 +1,5 @@
+import { logServerError } from "@/lib/logging";
+import { DevConversation } from "@/components/dev-debug";
 import { Welcome, hasConnection } from "@/components/welcome";
 import Link from "@/components/app-link";
 import { Header } from "@/components/header";
@@ -10,11 +12,13 @@ import { assertParticipant, groupMessages } from "@/lib/conversations";
 import { arenaUrl } from "@/lib/urls";
 export const dynamic = "force-dynamic";
 export default async function Thread({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  if (/^sample-[1-4]$/.test(id)) return <DevConversation index={Number(id.slice(-1)) - 1} />;
   if (!await hasConnection()) return <Welcome />;
-  const { id } = await params; const session = await getSession();
+  const session = await getSession();
   if (isDemo()) return <div className="page chat-page"><Header parent="Connections" back="/connections" title="Connection: Maya Chen & Alex Lee" /><Conversation recipient={demoPeople[0]} self={demoPeople[1]} initialMessages={demoMessages} demo /></div>;
   if (!session?.person || !session.token) return <div className="page"><Header parent="Connections" back="/connections" title="Private conversation" /><Link className="button" href={`/api/auth/login?next=${encodeURIComponent(`/connections/${id}`)}`}>Log in with Are.na →</Link></div>;
   try { const client = new ArenaClient(session.token); const channel = await client.item("Channel", id); const people = assertParticipant(channel, session.person.id); const recipient = people.find(p => p.id !== session.person!.id)!; const contents = await client.contents(id, 1, 24, "position_desc");
     return <div className="page chat-page"><Header parent="Connections" back="/connections" title={channel.title || "Connection"} arenaHref={arenaUrl(channel)} /><Conversation channelId={channel.id} recipient={recipient} self={session.person} initialMessages={groupMessages(contents.data)} initialNext={contents.meta.next_page} /></div>;
-  } catch (e) { return <div className="page"><Header parent="Connections" back="/connections" title="Private conversation" /><p className="notice error">{e instanceof Error ? e.message : "This conversation is unavailable."}</p><Link href="/connections">← My connections</Link></div>; }
+  } catch (e) { logServerError(e, { event: "page.load_failed", route: "/connections/[id]", method: "GET" }); return <div className="page"><Header parent="Connections" back="/connections" title="Private conversation" /><p className="notice error">{e instanceof Error ? e.message : "This conversation is unavailable."}</p><Link href="/connections">← My connections</Link></div>; }
 }

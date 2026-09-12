@@ -6,7 +6,7 @@ export async function GET() {
   try {
     if (!isDemo()) await requireSession();
     return privateJson({ prompts: await profilePrompts() });
-  } catch (error) { return apiError(error); }
+  } catch (error) { return apiError(error, { route: "/api/prompts", method: "GET" }); }
 }
 
 export async function POST(request: import("next/server").NextRequest) {
@@ -21,5 +21,5 @@ export async function POST(request: import("next/server").NextRequest) {
     const channel = await client.item("Channel", process.env.ARENA_PROPOSED_PROMPTS_CHANNEL || "proposed-prompts");
     const block = await client.request<{ id: number }>("/blocks", { method: "POST", body: { value: /^https?:\/\/\S+$/.test(text) ? `<${text}>` : text, channels: [{ id: channel.id }] } });
     return privateJson({ id: block.id });
-  } catch (error) { return apiError(error); }
+  } catch (error) { return apiError(error, { route: "/api/prompts", method: "POST" }); }
 }

@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useDevDebug } from "./dev-debug";
 
 export function DesktopWindow({ children, logout }: { children: React.ReactNode; logout?: React.ReactNode }) {
+  const debug = useDevDebug();
   const searchParams = useSearchParams();
   const intro = searchParams.get("intro");
   const hasError = searchParams.has("error");
@@ -20,6 +22,15 @@ export function DesktopWindow({ children, logout }: { children: React.ReactNode;
   const closing = useRef(false);
   const launcher = useRef<HTMLButtonElement>(null);
   const close = useRef<HTMLButtonElement>(null);
+  const fullscreenButton = useRef<HTMLButtonElement>(null);
+  const exitFullscreenButton = useRef<HTMLButtonElement>(null);
+  const wasFullscreen = useRef(false);
+
+  useEffect(() => {
+    if (fullscreen) exitFullscreenButton.current?.focus();
+    else if (wasFullscreen.current) fullscreenButton.current?.focus();
+    wasFullscreen.current = fullscreen;
+  }, [fullscreen]);
 
   useEffect(() => { viewport.current?.scrollTo(0, 0); }, [pathname]);
 
@@ -121,7 +132,7 @@ export function DesktopWindow({ children, logout }: { children: React.ReactNode;
       animationFrame.current = null;
       if (windowElement.current) windowElement.current.hidden = false;
       animateWindow(false);
-      close.current?.focus();
+      windowElement.current?.focus({ preventScroll: true });
     });
   }
 
@@ -150,17 +161,18 @@ export function DesktopWindow({ children, logout }: { children: React.ReactNode;
     </button>
     {logout}
     </div>
-    <section ref={windowElement} className="browser-window" hidden={!open} aria-label="Connections browser window">
+    <section ref={windowElement} tabIndex={-1} className="browser-window" hidden={!open} aria-label="Connections browser window">
       <div className="app-progress" aria-hidden="true"><span /></div>
       <header className="browser-chrome">
         <div className="window-traffic-lights">
           <button ref={close} className="window-dot window-dot-close" aria-label="Close Connections window" onClick={() => toggleWindow(false)}><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2L2 8" /></svg></button>
-          <button className="window-dot window-dot-minimize" aria-label="Minimize Connections window" onClick={() => toggleWindow(false)}><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5h6" /></svg></button>
-          <button className="window-dot window-dot-fullscreen" aria-label="Show app full screen" onClick={() => setFullscreen(true)}><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5h6M5 2v6" /></svg></button>
+          <button className="window-dot window-dot-minimize" aria-label={debug.available ? "Toggle dummy users and matches" : "Minimize Connections window"} aria-pressed={debug.available ? debug.enabled : undefined} title={debug.available ? `Dummy data: ${debug.enabled ? "on" : "off"}` : "Minimize"} onClick={() => debug.available ? debug.toggle(!debug.enabled) : toggleWindow(false)}><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5h6" /></svg></button>
+          <button ref={fullscreenButton} className="window-dot window-dot-fullscreen" aria-label="Show app full screen" onClick={() => setFullscreen(true)}><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5h6M5 2v6" /></svg></button>
         </div>
         <div className="window-address">connections.forum<span>{pathname === "/" ? "" : pathname}</span></div>
         <span className="window-chrome-spacer" aria-hidden />
       </header>
+      {fullscreen && <button ref={exitFullscreenButton} className="exit-fullscreen" type="button" onClick={() => setFullscreen(false)}>Exit full screen</button>}
       <div className="window-viewport" ref={viewport}>
         <div className="window-content">{children}</div>
       </div>

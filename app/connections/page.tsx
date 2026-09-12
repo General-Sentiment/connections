@@ -1,3 +1,5 @@
+import { logServerError } from "@/lib/logging";
+import { DevListing } from "@/components/dev-debug";
 import { Welcome, hasConnection } from "@/components/welcome";
 import Link from "@/components/app-link";
 import { randomInt } from "node:crypto";
@@ -15,6 +17,8 @@ import { allConversations, participants } from "@/lib/conversations";
 import { demoChannel, demoPeople, demoProfiles } from "@/lib/demo";
 import type { Item } from "@/lib/types";
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Your connections" };
+
 export default async function Connections({ searchParams }: { searchParams: Promise<{ page?: string; view?: string; open_to?: string; order?: string; seed?: string }> }) {
   if (!await hasConnection()) return <Welcome />;
   const query = await searchParams; const filter = intentions.find(([key]) => key === query.open_to)?.[0]; const page = Math.max(1, Number(query.page) || 1); const view = query.view === "table" ? "table" : "grid"; const demo = isDemo(); const session = await getSession(); let channels: Item[] = []; let error = ""; let next: number | null = null;
@@ -24,7 +28,7 @@ export default async function Connections({ searchParams }: { searchParams: Prom
   else if (session?.person && session.token) try {
     const client = new ArenaClient(session.token);
     channels = await allConversations(client, session.person);
-  } catch (e) { error = e instanceof Error ? e.message : "Could not load conversations."; }
+  } catch (e) { logServerError(e, { event: "page.load_failed", route: "/connections", method: "GET" }); error = e instanceof Error ? e.message : "Could not load conversations."; }
   if (filter && !error) try {
     const matching: Item[] = [];
     for (const channel of channels) {
@@ -39,12 +43,12 @@ export default async function Connections({ searchParams }: { searchParams: Prom
       if (profile?.details.open_to.includes(filter)) matching.push(channel);
     }
     channels = matching;
-  } catch (e) { channels = []; next = null; error = e instanceof Error ? e.message : "Could not filter conversations."; }
+  } catch (e) { logServerError(e, { event: "page.load_failed", route: "/connections", method: "GET" }); channels = []; next = null; error = e instanceof Error ? e.message : "Could not filter conversations."; }
   if (!error) {
     if (order === "random") channels.sort((a, b) => (Math.imul(a.id ^ seed, 2654435761) >>> 0) - (Math.imul(b.id ^ seed, 2654435761) >>> 0));
     else channels.sort((a, b) => Date.parse(order === "newest" ? b.created_at : b.updated_at) - Date.parse(order === "newest" ? a.created_at : a.updated_at));
     next = channels.length > page * 24 ? page + 1 : null;
     channels = channels.slice((page - 1) * 24, page * 24);
   }
-  return <div className="page directory-page"><DirectoryHeader active="connections" />{!demo && !session?.person ? <div className="notice"><p>Log in to see your private conversations.</p><Link className="button" href="/api/auth/login?next=/connections">Log in with Are.na →</Link></div> : <><div className="info-grid"><section><h2 className="info-title">About</h2><p>Your conversations are private channels owned by you or your connection. The directory group has no access.</p></section><section><h2 className="info-title">View</h2><DirectoryView view={view} /></section><section><h2 className="info-title">Order</h2><DirectoryOrder order={order} seed={seed} /></section><section><h2 className="info-title">Open to</h2><DirectoryFilter value={filter || "all"} /></section></div>{error && <p className="notice error">{error}</p>}<div className={view === "table" && channels.length ? "connection-table" : "grid"}>{!channels.length && !error && !filter && <Link className="first-connection-block" href="/">Create your first connection</Link>}{!channels.length && !error && filter && <p className="empty">No connections match this filter.</p>}{channels.map(channel => view === "table" ? <Link className="connection-table-row" key={channel.id} href={`/connections/${channel.id}`}><span>{channel.title?.replace(/^Connection:\s*/i, "")}</span><span className="muted">{channel.counts?.contents ?? channel.counts?.blocks ?? 0} blocks</span></Link> : <Card key={channel.id} item={{ ...channel, title: channel.title?.replace(/^Connection:\s*/i, "") ?? null }} href={`/connections/${channel.id}`} />)}</div>{next && <Link className="button" href={`/connections?page=${next}&view=${view}&order=${order}${order === "random" ? `&seed=${seed}` : ""}${filter ? `&open_to=${filter}` : ""}`}>Load more →</Link>}</>}{demo && <p className="preview-note">Preview · Sample conversation.</p>}</div>;
+  return <div className="page directory-page"><DirectoryHeader active="connections" />{!demo && !session?.person ? <div className="notice"><p>Log in to see your private conversations.</p><Link className="button" href="/api/auth/login?next=/connections">Log in with Are.na →</Link></div> : <><div className="info-grid"><section><h2 className="info-title">Info</h2><p>Your conversations are private channels owned by you or your connection. The directory group has no access.</p></section><section><h2 className="info-title">View</h2><DirectoryView view={view} /></section><section><h2 className="info-title">Order</h2><DirectoryOrder order={order} seed={seed} /></section><section><h2 className="info-title">Open to</h2><DirectoryFilter value={filter || "all"} /></section></div><DevListing matches view={view}>{error && <p className="notice error">{error}</p>}<div className={view === "table" ? "connection-table" : "grid"}>{!channels.length && !error && !filter && <Link className="first-connection-block" href="/">Create your first connection</Link>}{!channels.length && !error && filter && <p className="empty">No connections match this filter.</p>}{channels.map(channel => view === "table" ? <Link className="connection-table-row" key={channel.id} href={`/connections/${channel.id}`}><span>{channel.title?.replace(/^Connection:\s*/i, "")}</span><span className="muted">{channel.counts?.contents ?? channel.counts?.blocks ?? 0} blocks</span></Link> : <Card key={channel.id} item={{ ...channel, title: channel.title?.replace(/^Connection:\s*/i, "") ?? null }} href={`/connections/${channel.id}`} />)}</div>{next && <Link className="button" href={`/connections?page=${next}&view=${view}&order=${order}${order === "random" ? `&seed=${seed}` : ""}${filter ? `&open_to=${filter}` : ""}`}>Load more →</Link>}</DevListing></>}{demo && <p className="preview-note">Preview · Sample conversation.</p>}</div>;
 }

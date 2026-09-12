@@ -22,5 +22,5 @@ export async function GET(request: NextRequest) {
       if (parsed.success) locations.set(parsed.data.id, parsed.data);
     }
     return privateJson({ locations: [...locations.values()] });
-  } catch (e) { return apiError(e); }
+  } catch (e) { return apiError(e, { route: "/api/locations", method: "GET" }); }
 }

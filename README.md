@@ -55,3 +55,21 @@ Selecting a city saves its ID, region, and ISO country code in the details block
 The profile editor loads text blocks from `ARENA_PROMPTS_CHANNEL` (default `prompts-lkiimgy92_0`) using a five-minute server cache. Each selection pairs a unique prompt with a public block or channel. Profiles require at least three selections and can include more. Clicking either a block or channel in the picker selects it. Original prompt blocks are connected immediately before their responses in the profile channel. Chosen prompt IDs and text are also saved in the profile’s details block so changes to the prompt catalog do not rewrite existing profiles.
 
 Public directory and profile reads reuse the in-memory API cache for up to 60 seconds (or less when Are.na requests it). Successful writes invalidate it immediately. Prompts have a separate five-minute cache; recent items and publication checks stay uncached; authenticated responses are never stored in the public cache. The cache is per server process, so separate instances can still make independent requests.
+
+## Error logs
+
+Server failures are written as structured JSON to Vercel Runtime Logs. In the
+Vercel `connections` project, open **Logs**, select the deployment/environment
+and **Error** level, then search for `api.failed`, `auth.`, `page.load_failed`,
+or `server.unhandled_error`. Expand the associated request for Vercel's request
+context. Entries include a static route template, HTTP method, status when
+available, error category, and source file/line locations when available.
+
+This covers API errors (including profile creation), sign-in failures, caught
+page-load errors, and uncaught Next.js server errors. Failed conversation
+discovery during sign-in is logged even though sign-in can still succeed.
+Request bodies, headers, query strings, arbitrary error messages, and error
+causes are deliberately excluded to avoid recording tokens or personal content.
+Existing API response statuses are preserved. Browser-only failures are not
+collected, and this does not configure notifications or long-term log storage.
+Logging becomes active on Vercel after deploying these changes.

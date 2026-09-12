@@ -10,6 +10,8 @@ import { ArenaClient } from "@/lib/arena";
 import { findConversation, assertParticipant } from "@/lib/conversations";
 import type { Person } from "@/lib/types";
 export const dynamic = "force-dynamic";
+export const metadata = { title: "New connection" };
+
 export default async function NewConversation({ searchParams }: { searchParams: Promise<{ person?: string }> }) {
   if (!await hasConnection()) return <Welcome />;
   const query = await searchParams; const demo = isDemo(); const session = await getSession(); const id = Number(query.person); let person: Person;
