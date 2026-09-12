@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useState, useSyncExternalStore } from "react";
+import { createContext, useContext, useEffect, useState, useSyncExternalStore } from "react";
 import Link from "./app-link";
 import { Header } from "./header";
 import { Conversation } from "./conversation";
@@ -14,9 +14,17 @@ const dummyPhotos = [
   "https://images.are.na/eyJidWNrZXQiOiJhcmVuYV9pbWFnZXMiLCJrZXkiOiIxNTQxMzA0L29yaWdpbmFsX2QxNGNkZmEzN2VhNzA4YjhhM2YyMTRjMzgyZTQwODQ1LmpwZyIsImVkaXRzIjp7InJlc2l6ZSI6eyJ3aWR0aCI6NjAwLCJoZWlnaHQiOjYwMCwiZml0IjoiaW5zaWRlIiwid2l0aG91dEVubGFyZ2VtZW50Ijp0cnVlfSwid2VicCI6eyJxdWFsaXR5Ijo3NX0sImZsYXR0ZW4iOnsiYmFja2dyb3VuZCI6eyJyIjoyMDMsImciOjIwMywiYiI6MjAzfX0sImpwZWciOnsicXVhbGl0eSI6NzV9LCJyb3RhdGUiOm51bGx9fQ==",
   "https://images.are.na/eyJidWNrZXQiOiJhcmVuYV9pbWFnZXMiLCJrZXkiOiIxMTAzNjQyNC9vcmlnaW5hbF8yZTUyNjMzY2Q3Y2I1OTJjZTcyNGNlYjUxNzI4ZjEyZi5qcGciLCJlZGl0cyI6eyJyZXNpemUiOnsid2lkdGgiOjYwMCwiaGVpZ2h0Ijo2MDAsImZpdCI6Imluc2lkZSIsIndpdGhvdXRFbmxhcmdlbWVudCI6dHJ1ZX0sIndlYnAiOnsicXVhbGl0eSI6NzV9LCJmbGF0dGVuIjp7ImJhY2tncm91bmQiOnsiciI6MjAzLCJnIjoyMDMsImIiOjIwM319LCJqcGVnIjp7InF1YWxpdHkiOjc1fSwicm90YXRlIjpudWxsfX0="
 ];
+const fakeDataStorageKey = "connections:fake-data";
 const Debug = createContext({ enabled: false, toggle: (_value: boolean) => {} });
 export function DevDebugProvider({ children }: { children: React.ReactNode }) {
-  const [enabled, toggle] = useState(false);
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    try { setEnabled(localStorage.getItem(fakeDataStorageKey) === "true"); } catch { /* Storage may be unavailable. */ }
+  }, []);
+  function toggle(value: boolean) {
+    setEnabled(value);
+    try { localStorage.setItem(fakeDataStorageKey, String(value)); } catch { /* Keep the toggle usable without storage. */ }
+  }
   return <Debug.Provider value={{ enabled, toggle }}>{children}</Debug.Provider>;
 }
 const subscribeToHydration = () => () => {};
