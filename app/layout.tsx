@@ -3,11 +3,22 @@ import { AccountBar } from "@/components/account-bar";
 import { getSession } from "@/lib/session";
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import localFont from "next/font/local";
 import { DesktopWindow } from "@/components/desktop-window";
 import "./globals.css";
+const areal = localFont({
+  src: [
+    { path: "./fonts/ABCAreal-Regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/ABCAreal-Bold.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/ABCAreal-RegularItalic.woff2", weight: "400", style: "italic" },
+    { path: "./fonts/ABCAreal-BoldItalic.woff2", weight: "700", style: "italic" },
+  ],
+  variable: "--font-areal",
+  display: "swap",
+});
 export const metadata: Metadata = { metadataBase: new URL(process.env.APP_URL || "https://connections.forum"), title: { default: "Connections", template: "%s / Connections" }, description: "Meet people through their collections on Are.na.", twitter: { card: "summary_large_image" } };
 async function DesktopLogout() {
   const session = await getSession();
   return session?.token && session.person ? <form className="desktop-logout" action="/api/auth/logout" method="post"><button className="quiet" type="submit">Log out</button></form> : null;
 }
-export default function RootLayout({ children }: { children: React.ReactNode }) { return <html lang="en" suppressHydrationWarning><head><script dangerouslySetInnerHTML={{ __html: 'try{var theme=localStorage.getItem("connections:theme");if(theme==="light"||theme==="dark")document.documentElement.dataset.theme=theme}catch{}' }} /></head><body><DevDebugProvider><Suspense><DesktopWindow logout={<Suspense><DesktopLogout /></Suspense>}><a className="skip-link" href="#main">Skip to content</a><Suspense><AccountBar /></Suspense><main id="main" tabIndex={-1}>{children}</main></DesktopWindow></Suspense></DevDebugProvider></body></html>; }
+export default function RootLayout({ children }: { children: React.ReactNode }) { return <html lang="en" className={areal.variable} suppressHydrationWarning><head><script dangerouslySetInnerHTML={{ __html: 'try{var theme=localStorage.getItem("connections:theme");if(theme==="light"||theme==="dark")document.documentElement.dataset.theme=theme}catch{}' }} /></head><body><DevDebugProvider><Suspense><DesktopWindow logout={<Suspense><DesktopLogout /></Suspense>}><a className="skip-link" href="#main">Skip to content</a><Suspense><AccountBar /></Suspense><main id="main" tabIndex={-1}>{children}</main></DesktopWindow></Suspense></DevDebugProvider></body></html>; }
