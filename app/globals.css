@@ -191,7 +191,7 @@ button.window-close:hover{background:var(--hover);color:var(--fg)}
 .window-address span{color:var(--dim)}
 .window-chrome-spacer{width:24px;flex-shrink:0}
 .window-viewport{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
-.window-content{zoom:.9;min-height:100%}
+.window-content{min-height:100%}
 .desktop-launcher{display:flex;flex-direction:column;gap:14px;padding:20px;background:transparent;font-size:13px;font-weight:400}
 .desktop-launcher:hover{background:transparent}
 .desktop-app-icon{width:64px;height:56px;display:flex;justify-content:center;align-items:center}
