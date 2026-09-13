@@ -1,3 +1,4 @@
+import { ArenaButton } from "@/components/arena-button";
 import { DevProfile } from "@/components/dev-debug";
 import { logServerError } from "@/lib/logging";
 import { ProfileVisibility } from "@/components/profile-visibility";
@@ -34,13 +35,14 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
     {session?.person?.id === profile.person.id && <ProfileVisibility channelId={profile.channel.id} hidden={profile.channel.metadata?.hidden === true} banner />}
     <div className="profile-introduction">
       {photo && <div className="profile-content-photo"><img src={photo} alt={profile.person.name} /></div>}
-      <dl className="rows profile-attributes">
+      <div className="profile-details"><dl className="rows profile-attributes">
         <div><dt>Location</dt><dd>{[profile.details.location.city, profile.details.location.country].filter(Boolean).join(", ") || "—"}</dd></div>
         <div><dt>Open to</dt><dd>{intentions.filter(([value]) => profile.details.open_to.includes(value)).map(([, label]) => label).join(", ") || "—"}</dd></div>
         <div><dt>Meeting preference</dt><dd>{profile.details.local_only ? "Prefer local" : "Open to anywhere"}</dd></div>
         <div><dt>Created</dt><dd><time dateTime={profile.channel.created_at}>{formatDate(profile.channel.created_at)}</time></dd></div>
         <div><dt>Last updated</dt><dd><time dateTime={profile.channel.updated_at}>{formatDate(profile.channel.updated_at)}</time></dd></div>
       </dl>
+      <ArenaButton href={`https://www.are.na/${encodeURIComponent(profile.person.slug)}`} label="View on Are.na" /></div>
       <section className="profile-introduction-text"><h2 className="info-title">Who are you?</h2><p className="preview-text">{profile.whoAreYou || "—"}</p></section>
       <section className="profile-introduction-text"><h2 className="info-title">Looking for</h2><p className="preview-text">{profile.lookingFor || "—"}</p></section>
     </div>

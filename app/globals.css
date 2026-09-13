@@ -659,3 +659,6 @@ html,body{line-height:1.45;-webkit-font-smoothing:antialiased;text-rendering:opt
 .account-bar .button,.page-actions button:not(.arena-button),.page-actions a.button:not(.arena-button){font-size:12.5px;line-height:0;height:24px;min-height:24px;padding:0 10px}
 @media(max-width:520px){.account-bar .button,.page-actions button:not(.arena-button),.page-actions a.button:not(.arena-button){height:37px;min-height:37px}}
 .text-tile,.about-card .text-tile,.featured-profile-items .text-tile,.table-about-text,.table-introduction{font-size:14.4px;line-height:1.45}
+
+.profile-details .profile-attributes{margin-bottom:12px}
+.arena-button-labeled svg{width:22px;height:auto;flex-shrink:0}
