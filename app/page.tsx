@@ -76,8 +76,12 @@ export default async function Directory({ searchParams }: { searchParams: Promis
   if (view !== "table" && !hasFilter && !demo && !about && aboutBlockId()) {
     try { const block = await new ArenaClient().item("Block", aboutBlockId()); if (block.type === "Text" && block.visibility !== "private") about = block; } catch { /* Other directory content remains available. */ }
   }
+  // Only the first grid batch reserves spaces for the introductory tiles.
+  const profileLimit = view === "grid"
+    ? page * 9 - Number(Boolean(about)) - Number(!existingProfile?.published)
+    : page * 8;
   items = items.filter(item => item.type === "Channel");
-  if (!filter) { next = items.length > page * 8 ? page + 1 : null; items = items.slice(0, page * 8); }
+  if (!filter) { next = items.length > profileLimit ? page + 1 : null; items = items.slice(0, profileLimit); }
   if (about) items.unshift(about);
   let entries = await Promise.all(items.map(async item => {
     if (item.type !== "Channel") return { item };
@@ -87,8 +91,8 @@ export default async function Directory({ searchParams }: { searchParams: Promis
   entries = entries.filter(entry => !("unavailable" in entry && entry.unavailable));
   if (filter) {
     const matching = entries.filter(entry => entry.profile?.details.open_to.includes(filter));
-    next = matching.length > page * 8 ? page + 1 : null;
-    entries = matching.slice(0, page * 8);
+    next = matching.length > profileLimit ? page + 1 : null;
+    entries = matching.slice(0, profileLimit);
   }
   return <div className="page directory-page homepage"><RefreshProfile /><DirectoryHeader active="profiles" hasProfile={Boolean(existingProfile)} />
     <MobileDirectoryControls><div className="info-grid"><section><h2 className="info-title">View</h2><DirectoryView view={view} /></section><section><h2 className="info-title">Order</h2><DirectoryOrder order={order} seed={seed} /></section><section><h2 className="info-title">Open to</h2><DirectoryFilter value={filter || "all"} /></section><section><h2 className="info-title">Location</h2><DirectoryLocation locations={locations} country={country} city={city} /></section></div></MobileDirectoryControls>
