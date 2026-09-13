@@ -8,6 +8,7 @@ import { DesktopWindow } from "@/components/desktop-window";
 import "./globals.css";
 const areal = localFont({
   src: "./fonts/ABCArealSuperfamilyVariable.woff2",
+  weight: "400 700",
   variable: "--font-areal",
   display: "swap",
 });

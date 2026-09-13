@@ -647,7 +647,7 @@ button.profile-primary:hover,a.button.profile-primary:hover{background:var(--fg)
 .directory-pagination{justify-content:center}
 
 /* Typography measured from Are.na's channel interface. */
-html,body{line-height:1.45;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-optical-sizing:auto;font-variation-settings:var(--areal-dark-mode)}
+html,body{line-height:1.45;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-optical-sizing:auto;font-variation-settings:var(--areal-dark-mode);font-synthesis-weight:none}
 :root{--areal-dark-mode:"DRKM" 0}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--areal-dark-mode:"DRKM" 1}}
 :root[data-theme="dark"]{--areal-dark-mode:"DRKM" 1}
