@@ -647,10 +647,14 @@ button.profile-primary:hover,a.button.profile-primary:hover{background:var(--fg)
 .directory-pagination{justify-content:center}
 
 /* Typography measured from Are.na's channel interface. */
-html,body{line-height:1.45}
-.page-heading h1{font-weight:700}
+html,body{line-height:1.45;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-optical-sizing:auto;font-variation-settings:var(--areal-dark-mode)}
+:root{--areal-dark-mode:"DRKM" 0}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--areal-dark-mode:"DRKM" 1}}
+:root[data-theme="dark"]{--areal-dark-mode:"DRKM" 1}
+.page-heading h1{font-size:28px;line-height:1.25;font-weight:700}
+@media(max-width:520px){.page-heading h1{font-size:19.2px;line-height:1.45}}
 .info-grid .info-title{font-size:12.5px;line-height:1}
 .info-grid p,.rows,.card-caption,.view-options button,.location-filter,.location-filter-label,.location-filter select{font-size:12.5px;line-height:1.35}
-.view-options button{line-height:18px}
+.view-options button{line-height:1.35}
 .account-bar .button,.page-actions button,.page-actions a.button{font-size:12.5px}
 .text-tile,.about-card .text-tile,.featured-profile-items .text-tile,.table-about-text,.table-introduction{font-size:14.4px;line-height:1.45}

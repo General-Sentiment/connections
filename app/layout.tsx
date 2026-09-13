@@ -7,12 +7,7 @@ import localFont from "next/font/local";
 import { DesktopWindow } from "@/components/desktop-window";
 import "./globals.css";
 const areal = localFont({
-  src: [
-    { path: "./fonts/ABCAreal-Regular.woff2", weight: "400", style: "normal" },
-    { path: "./fonts/ABCAreal-Bold.woff2", weight: "700", style: "normal" },
-    { path: "./fonts/ABCAreal-RegularItalic.woff2", weight: "400", style: "italic" },
-    { path: "./fonts/ABCAreal-BoldItalic.woff2", weight: "700", style: "italic" },
-  ],
+  src: "./fonts/ABCArealSuperfamilyVariable.woff2",
   variable: "--font-areal",
   display: "swap",
 });

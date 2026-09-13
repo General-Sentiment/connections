@@ -6,6 +6,9 @@ import { appUrl } from "@/lib/config";
 import { discoverConversations } from "@/lib/conversations";
 export async function GET(request: NextRequest) {
   const session = await getSession(); const oauth = session?.oauth;
+  // A completed callback may be revisited after its one-use state is consumed.
+  // Keep the existing session; never exchange an unverified callback's code.
+  if (!oauth && session?.token && session.person) return NextResponse.redirect(new URL("/?intro=skip", appUrl()));
   const fail = (event: string, message: string, error?: unknown, status?: number) => {
     logServerError(error, { event, route: "/api/auth/callback", method: "GET", status });
     return NextResponse.redirect(new URL(`/?error=${encodeURIComponent(message)}`, appUrl()));

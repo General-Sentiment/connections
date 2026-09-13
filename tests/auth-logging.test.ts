@@ -43,3 +43,37 @@ it("logs optional discovery failure while completing login", async () => {
   expect(JSON.parse(output.mock.calls[0][0]).event).toBe("auth.conversation_discovery_failed");
   expect(JSON.stringify(output.mock.calls)).not.toMatch(/secret|Private Name|private conversation/);
 });
+
+it("returns to the directory when a completed callback is revisited", async () => {
+  const save = vi.fn();
+  const session = { token: "existing-token", person: { id: 1 }, save };
+  mocks.getSession.mockResolvedValue(session);
+  const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+  const output = vi.spyOn(console, "error").mockImplementation(() => {});
+  const response = await GET(request());
+  expect(response.headers.get("location")).toBe("https://connections.test/?intro=skip");
+  expect(fetch).not.toHaveBeenCalled();
+  expect(save).not.toHaveBeenCalled();
+  expect(session.token).toBe("existing-token");
+  expect(output).not.toHaveBeenCalled();
+});
+
+it("still rejects a mismatched pending OAuth state when already signed in", async () => {
+  const save = vi.fn();
+  mocks.getSession.mockResolvedValue({ token: "existing-token", person: { id: 1 }, oauth: { state: "different-state", created: Date.now() }, save });
+  const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const response = await GET(request());
+  expect(response.headers.get("location")).toContain("error=");
+  expect(fetch).not.toHaveBeenCalled();
+  expect(save).not.toHaveBeenCalled();
+});
+
+it("still reports an expired login when there is no authenticated session", async () => {
+  mocks.getSession.mockResolvedValue({ save: vi.fn() });
+  const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const response = await GET(request());
+  expect(response.headers.get("location")).toContain("error=");
+  expect(fetch).not.toHaveBeenCalled();
+});

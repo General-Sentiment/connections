@@ -22,6 +22,7 @@ import { RefreshProfile } from "@/components/refresh-profile";
 import { ArenaClient, ArenaError } from "@/lib/arena";
 import { getSession } from "@/lib/session";
 import { randomInt } from "node:crypto";
+import { redirect } from "next/navigation";
 import { directoryClient } from "@/lib/directory-auth";
 import type { Item } from "@/lib/types";
 
@@ -31,6 +32,11 @@ export const metadata = { title: "Profiles" };
 export default async function Directory({ searchParams }: { searchParams: Promise<{ page?: string; error?: string; order?: string; seed?: string; view?: string; open_to?: string; country?: string; city?: string }> }) {
   if (!await hasConnection()) return <Welcome />;
   const query = await searchParams; const page = /^\d{1,4}$/.test(query.page || "") ? Math.max(1, Number(query.page)) : 1; const demo = isDemo();
+  // This page is only reached with a session. Drop a stale expired-login URL.
+  if (query.error === "This login request expired. Please try again.") {
+    const clean = new URLSearchParams(Object.entries(query).filter(([key, value]) => key !== "error" && typeof value === "string") as [string, string][]);
+    redirect(clean.size ? `/?${clean}` : "/");
+  }
   const filter = intentions.find(([value]) => value === query.open_to)?.[0];
   const country = (query.country || "").slice(0, 100);
   const city = /^osm:[NWR]:\d+$/.test(query.city || "") ? query.city! : "";
