@@ -662,3 +662,10 @@ html,body{line-height:1.45;-webkit-font-smoothing:antialiased;text-rendering:opt
 
 .profile-details .profile-attributes{margin-bottom:12px}
 .arena-button-labeled svg{width:22px;height:auto;flex-shrink:0}
+
+.preview-text a,.featured-description a{text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}
+
+.profile-detail-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.profile-detail-actions .button{min-height:44px;padding:10px 12px;font-size:16px;line-height:1.35;white-space:normal}
+
+@media(max-width:600px){.profile-detail-actions{grid-template-columns:minmax(0,1fr)}}
