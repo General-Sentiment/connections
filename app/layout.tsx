@@ -12,7 +12,7 @@ const areal = localFont({
   variable: "--font-areal",
   display: "swap",
 });
-export const metadata: Metadata = { metadataBase: new URL(process.env.APP_URL || "https://connections.forum"), title: { default: "Connections", template: "%s / Connections" }, description: "Meet people through their collections on Are.na.", twitter: { card: "summary_large_image" } };
+export const metadata: Metadata = { metadataBase: new URL(process.env.APP_URL || "https://connections.forum"), title: "Connections", description: "Meet people through their collections on Are.na.", twitter: { card: "summary_large_image" } };
 async function DesktopLogout() {
   const session = await getSession();
   return session?.token && session.person ? <form className="desktop-logout" action="/api/auth/logout" method="post"><button className="quiet" type="submit">Log out</button></form> : null;

@@ -18,7 +18,6 @@ import { allConversations, participants } from "@/lib/conversations";
 import { demoChannel, demoPeople, demoProfiles } from "@/lib/demo";
 import type { Item } from "@/lib/types";
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Your connections" };
 
 export default async function Connections({ searchParams }: { searchParams: Promise<{ page?: string; view?: string; open_to?: string; order?: string; seed?: string }> }) {
   if (!await hasConnection()) return <Welcome />;

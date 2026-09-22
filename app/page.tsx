@@ -1,3 +1,4 @@
+import { readAboutBlock } from "@/lib/about";
 import { logServerError } from "@/lib/logging";
 import { DevListing } from "@/components/dev-debug";
 import { DirectoryLocation, type LocationOption } from "@/components/directory-location";
@@ -15,7 +16,7 @@ import { DirectoryView } from "@/components/directory-view";
 import { ProfileCard } from "@/components/profile-card";
 import { ProfileTable } from "@/components/profile-table";
 import { readProfile, availableProfileRef } from "@/lib/profiles";
-import { Card } from "@/components/card";
+import { DirectoryAbout } from "@/components/directory-about";
 import { demoProfiles } from "@/lib/demo";
 import { isDemo, groupId, aboutBlockId } from "@/lib/config";
 import { RefreshProfile } from "@/components/refresh-profile";
@@ -27,7 +28,6 @@ import { directoryClient } from "@/lib/directory-auth";
 import type { Item } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Profiles" };
 
 export default async function Directory({ searchParams }: { searchParams: Promise<{ page?: string; error?: string; order?: string; seed?: string; view?: string; open_to?: string; country?: string; city?: string }> }) {
   if (!await hasConnection()) return <Welcome />;
@@ -72,17 +72,17 @@ export default async function Directory({ searchParams }: { searchParams: Promis
     return [[id || `country:${country}`, { id, city: String(m.location_city || ""), region: String(m.location_region || ""), country, countryLabel: /^[A-Z]{2}$/.test(country) ? countryName(country) : country }] as const];
   })).values()];
   items = items.filter(item => locationMatches(item.metadata, country, city));
-  let about = hasFilter ? undefined : items.find(item => item.type === "Text" && item.title === "About");
-  if (view !== "table" && !hasFilter && !demo && !about && aboutBlockId()) {
-    try { const block = await new ArenaClient().item("Block", aboutBlockId()); if (block.type === "Text" && block.visibility !== "private") about = block; } catch { /* Other directory content remains available. */ }
+  const showAbout = view === "grid" && !hasFilter;
+  let about: Item | undefined;
+  if (showAbout && !demo && aboutBlockId()) {
+    try { about = await readAboutBlock(aboutBlockId()); } catch { /* Other directory content remains available. */ }
   }
   // Only the first grid batch reserves spaces for the introductory tiles.
   const profileLimit = view === "grid"
-    ? page * 9 - Number(Boolean(about)) - Number(!existingProfile?.published)
+    ? page * 9 - Number(showAbout) - Number(!existingProfile?.published)
     : page * 8;
   items = items.filter(item => item.type === "Channel");
   if (!filter) { next = items.length > profileLimit ? page + 1 : null; items = items.slice(0, profileLimit); }
-  if (about) items.unshift(about);
   let entries = await Promise.all(items.map(async item => {
     if (item.type !== "Channel") return { item };
     try { return { item, profile: demo ? demoProfiles.find(p => p.channel.id === item.id) : await readProfile(item.id, new ArenaClient(), item) }; }
@@ -98,7 +98,7 @@ export default async function Directory({ searchParams }: { searchParams: Promis
     <MobileDirectoryControls><div className="info-grid"><section><h2 className="info-title">View</h2><DirectoryView view={view} /></section><section><h2 className="info-title">Order</h2><DirectoryOrder order={order} seed={seed} /></section><section><h2 className="info-title">Open to</h2><DirectoryFilter value={filter || "all"} /></section><section><h2 className="info-title">Location</h2><DirectoryLocation locations={locations} country={country} city={city} /></section></div></MobileDirectoryControls>
     <DevListing view={view}>{query.error && <p className="notice error" role="alert">{query.error}</p>}{error && <p className="notice error" role="alert">{error}</p>}
     {!demo && !groupId() && <div className="notice"><p>The directory is being set up.</p><Link href="/setup">Continue setup →</Link></div>}
-    {view === "table" ? <ProfileTable entries={entries.filter(entry => entry.item.type === "Channel")} /> : <div className="grid">{!existingProfile?.published && <Link className="add-square add-yourself-tile" href="/profile/edit"><span aria-hidden>＋</span><span className="add-yourself-label">Add Yourself</span></Link>}{about && <div className="about-card"><Card item={about} caption="Info" /></div>}{entries.filter(entry => entry.item.type === "Channel").map(({ item, profile }) => <ProfileCard key={item.id} item={item} profile={profile} />)}</div>}
+    {view === "table" ? <ProfileTable entries={entries.filter(entry => entry.item.type === "Channel")} /> : <div className="grid">{showAbout && <DirectoryAbout item={about} blockId={aboutBlockId()} />}{!existingProfile?.published && <Link className="add-square add-yourself-tile" href="/profile/edit"><span aria-hidden>＋</span><span className="add-yourself-label">Add Yourself</span></Link>}{entries.filter(entry => entry.item.type === "Channel").map(({ item, profile }) => <ProfileCard key={item.id} item={item} profile={profile} />)}</div>}
     {!error && hasFilter && !entries.length && <p className="empty">No profiles match these filters.</p>}
     {next && <DirectoryLoadMore href={pageHref(next)} />}
     </DevListing>{demo && <p className="preview-note">Preview · Sample profiles. Nothing here has been published to Are.na. <Link href="/setup">Connect the live directory →</Link></p>}

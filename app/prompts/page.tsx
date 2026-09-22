@@ -10,7 +10,6 @@ import { DirectoryHeader } from "@/components/directory-header";
 import { profilePrompts, type ProfilePrompt } from "@/lib/prompts";
 import { relativeTime } from "@/lib/relative-time";
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Prompts" };
 
 export default async function PromptsPage({ searchParams }: { searchParams: Promise<{ view?: string; order?: string; seed?: string }> }) {
   const query = await searchParams;

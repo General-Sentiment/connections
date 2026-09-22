@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { sealData } from "iron-session";
 import { resetArenaRequestsForTests } from "../lib/arena-requests";
 import { ArenaClient } from "../lib/arena";
 import { sendMessage, ensureConversation } from "../lib/conversations";
@@ -67,6 +68,24 @@ describe("message persistence", () => {
   });
 });
 describe("profile writes", () => {
+  it.each([
+    ["ryan-wilson-YdpDztAn-W9w-unsplash (1).jpg", "ryan-wilson-YdpDztAn-W9w-unsplash%20(1).jpg"],
+    ["portrait #1?50%.jpg", "portrait%20%231%3F50%25.jpg"],
+    ["café.jpg", "caf%C3%A9.jpg"],
+  ])("encodes uploaded photo filename %s and reuses the raw key on retries", async (filename, encoded) => {
+    vi.stubEnv("ARENA_GROUP_ID", "77");
+    const password = "test-photo-secret-at-least-32-characters";
+    vi.stubEnv("SESSION_SECRET", password);
+    const photoKey = `uploads/photo-id/${filename}`;
+    const photoProof = await sealData({ key: photoKey, userId: alice.id, expires: Date.now() + 3600000 }, { password, ttl: 3600 });
+    const input = { whoAreYou: "Artist", lookingFor: "Conversation", details: { schema: "connections_profile", version: 1, location: { city: "Paris", country: "France" }, open_to: ["conversation"], local_only: false }, selected: [1, 2, 3].map(id => ({ id, type: "Block" })), photoKey, photoProof };
+    await saveProfile(alice, "token", input);
+    await saveProfile(alice, "token", input);
+    const photos = calls.filter(call => call.path === "/v3/blocks" && call.method === "POST" && call.body.metadata.role === "photo");
+    expect(photos).toHaveLength(1);
+    expect(photos[0].body.value).toBe(`https://s3.amazonaws.com/arena_images-temp/uploads/photo-id/${encoded}`);
+    expect(photos[0].body.channels[0].metadata.upload_key).toBe(photoKey);
+  });
   it("stores biography, description, details and three real connections, and reuses them on edit", async () => {
     vi.stubEnv("ARENA_GROUP_ID", "77"); vi.stubEnv("ARENA_PROFILES_CHANNEL", "999");
     const input = { whoAreYou: "An artist in Paris.", lookingFor: "Conversation", details: { schema: "connections_profile", version: 1, location: { city: "Paris", country: "France" }, open_to: ["conversation"], local_only: false }, selected: [1, 2, 3].map(id => ({ id, type: "Block" })) };

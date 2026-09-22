@@ -11,7 +11,6 @@ import { readProfile, availableProfileRef } from "@/lib/profiles";
 import { ArenaClient } from "@/lib/arena";
 import type { Profile } from "@/lib/types";
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Edit profile" };
 
 export default async function EditProfile() {
   if (!await hasConnection()) return <Welcome />;

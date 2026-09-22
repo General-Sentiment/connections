@@ -266,6 +266,8 @@ a.desktop-launcher{color:var(--fg);text-decoration:none;border:1px solid transpa
 @media(prefers-reduced-motion:reduce){.desktop-app-icon,.desktop-arena-icon{transition:none}.demo-pointer{display:none}.desktop-launching .desktop-app-icon{animation:none}}
 .page-heading h1{font-weight:400}
 .chat-page .page-heading h1 .heading-current{color:var(--private-text)}
+.chat-page .page-heading h1 .heading-current a{color:inherit}
+.chat-page .page-heading h1 .heading-current a:hover{text-decoration:underline}
 .conversation-info{grid-template-columns:minmax(0,1fr);margin-bottom:40px;text-align:left}
 .conversation-info>section:last-child{grid-column:auto}
 .conversation-info{row-gap:28px}

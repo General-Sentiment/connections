@@ -194,7 +194,9 @@ async function savePhoto(client: ArenaClient, person: Person, channel: number, i
     if (upload.key !== input.photoKey || upload.userId !== person.id || !upload.expires || upload.expires < Date.now()) throw new Error("The photo upload expired. Please select your photo again.");
     const existing = old.find(x => x.connection?.metadata?.upload_key === input.photoKey);
     if (!existing) {
-      await client.createBlock(channel, person.name, `https://s3.amazonaws.com/arena_images-temp/${input.photoKey}`, "photo", { upload_key: input.photoKey });
+      // The upload key is a raw object path; escape filenames while preserving folders.
+      const photoPath = input.photoKey.split("/").map(segment => encodeURIComponent(segment)).join("/");
+      await client.createBlock(channel, person.name, `https://s3.amazonaws.com/arena_images-temp/${photoPath}`, "photo", { upload_key: input.photoKey });
     }
     for (const photo of old) if (photo.id !== existing?.id && photo.connection) await client.disconnect(photo.connection.id);
   } else if (input.removePhoto) {
