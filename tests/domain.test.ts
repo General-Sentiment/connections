@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseDetails, serializeDetails, profileInputSchema, type Details } from "../lib/details";
+import { parseDetails, serializeDetails, plotProfileInputSchema, profileInputSchema, type Details } from "../lib/details";
 import { parseArenaUrl, safeUrl } from "../lib/urls";
 import { assertParticipant, groupMessages, messageSchema, participants } from "../lib/conversations";
 import { assembleProfile } from "../lib/profiles";
@@ -20,6 +20,18 @@ describe("details storage", () => {
     expect(() => parseDetails(encoded.replace("version: 1", "version: 1\nshowcase: []"))).toThrow();
     expect(() => parseDetails("```yaml\na: &a [1]\nb: *a\n``` ")).toThrow();
     expect(() => parseDetails(encoded.repeat(2))).toThrow();
+  });
+  it("accepts a lightweight Plot profile while keeping normal collection requirements", () => {
+    const input = { name: " Alice ", whoAreYou: "An artist.", lookingFor: "Friendship or collaboration", details, selected: [] };
+    expect(plotProfileInputSchema.parse(input).name).toBe("Alice");
+    expect(profileInputSchema.safeParse({ whoAreYou: input.whoAreYou, lookingFor: input.lookingFor, details, selected: [] }).success).toBe(false);
+    expect(plotProfileInputSchema.safeParse({ ...input, name: " " }).success).toBe(false);
+    expect(plotProfileInputSchema.safeParse({ ...input, details: { ...details, open_to: [] } }).success).toBe(false);
+    expect(plotProfileInputSchema.safeParse({ ...input, details: { ...details, location: { city: "", country: "" } } }).success).toBe(false);
+    expect(plotProfileInputSchema.safeParse({ ...input, selected: [{ id: 1, type: "Block" }] }).success).toBe(false);
+    const profile = assembleProfile({ ...channel, metadata: { profile_name: "Al" } }, [], alice);
+    expect(profile.person).toEqual({ ...alice, name: "Al" });
+    expect(alice.name).toBe("Alice");
   });
   it("requires exactly three unique typed selections and at least one intention", () => {
     const input = { whoAreYou: "An artist in Paris.", lookingFor: "A conversation", details, selected: [{ id: 1, type: "Block" }, { id: 3, type: "Block" }, { id: 2, type: "Block" }] };

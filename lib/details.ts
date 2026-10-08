@@ -36,3 +36,9 @@ export const profileInputSchema = z.object({
   useAccountPhoto: z.boolean().default(false),
   photoProof: z.string().max(4000).optional(), photoKey: z.string().max(1000).optional(), removePhoto: z.boolean().default(false),
 }).strict();
+
+// Event profiles omit the collection step; standard profiles still require it.
+export const plotProfileInputSchema = profileInputSchema.extend({
+  name: z.string().trim().min(1, "Enter your name.").max(300),
+  selected: z.array(selectionSchema).length(0),
+});

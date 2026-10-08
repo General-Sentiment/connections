@@ -4,7 +4,7 @@ import { ProfileVisibility } from "./profile-visibility";
 import { PromptPicker } from "./prompt-picker";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { blankDetails, intentions, profileInputSchema, type Details } from "@/lib/details";
+import { blankDetails, intentions, plotProfileInputSchema, profileInputSchema, type Details } from "@/lib/details";
 import type { Item, Person, Profile } from "@/lib/types";
 import { ItemPicker } from "./item-picker";
 import { CardFace } from "./card";
@@ -16,11 +16,12 @@ import { fillPrompts, unusedPrompts } from "@/lib/prompt-selection";
 import type { ProfilePrompt } from "@/lib/prompts";
 import { LocationPicker } from "./location-picker";
 import { clearCreationDraft, creationDraftKey, readCreationDraft, saveCreationDraft, saveCreationPhoto } from "@/lib/creation-draft";
-export function ProfileForm({ person, profile, demo }: { person: Person; profile?: Profile; demo: boolean }) {
+export function ProfileForm({ person, profile, demo, plot = false }: { person: Person; profile?: Profile; demo: boolean; plot?: boolean }) {
   const [choosingPrompt, setChoosingPrompt] = useState<number>();
+  const [name, setName] = useState(person.name);
   const [step, setStep] = useState(0);
   const wizard = !profile;
-  const draftKey = creationDraftKey(person.id, demo);
+  const draftKey = creationDraftKey(person.id, demo) + (plot ? ":plot" : "");
   const [draftReady, setDraftReady] = useState(!wizard);
   const [draftLoadFailed, setDraftLoadFailed] = useState(false);
   const [draftStatus, setDraftStatus] = useState("saving");
@@ -52,7 +53,7 @@ export function ProfileForm({ person, profile, demo }: { person: Person; profile
   const [promptError, setPromptError] = useState("");
   const [promptRetry, setPromptRetry] = useState(0);
   useEffect(() => {
-    if (!draftReady) return;
+    if (!draftReady || plot) return;
     const controller = new AbortController();
     setPromptError("");
     fetch("/api/prompts", { signal: controller.signal }).then(async response => {
@@ -64,7 +65,7 @@ export function ProfileForm({ person, profile, demo }: { person: Person; profile
       if (fillPrompts(data.prompts, []).filter(Boolean).length < 3) setPromptError("The prompts channel needs at least three different questions.");
     }).catch(error => { if (!controller.signal.aborted) setPromptError(error.message); });
     return () => controller.abort();
-  }, [promptRetry, draftReady]);
+  }, [promptRetry, draftReady, plot]);
   function remix(index: number) {
     setPrompts(previous => {
       const choices = unusedPrompts(promptOptions, previous);
@@ -72,13 +73,14 @@ export function ProfileForm({ person, profile, demo }: { person: Person; profile
       const next = [...previous]; next[index] = choices[Math.floor(Math.random() * choices.length)]; return next;
     });
   }
-  const finalStep = 6 + prompts.length;
+  const finalStep = plot ? 6 : 6 + prompts.length;
   function nextStep() {
-    const problem = step === 1 && !details.open_to.length ? "Choose at least one intention."
+    const problem = plot && step === 0 && !name.trim() ? "Enter your name."
+      : step === 1 && !details.open_to.length ? "Choose at least one intention."
       : step === 2 && (!details.location.city || !details.location.country) ? "Choose your city."
       : step === 4 && !whoAreYou.trim() ? "Tell people who you are."
       : step === 5 && !lookingFor.trim() ? "Tell people what you are looking for."
-      : step >= 6 && step < 6 + prompts.length && (!prompts[step - 6] || !selected[step - 6]) ? "Choose a prompt and an item."
+      : !plot && step >= 6 && step < 6 + prompts.length && (!prompts[step - 6] || !selected[step - 6]) ? "Choose a prompt and an item."
       : "";
     if (problem) { setError(problem); return; }
     setError(""); setStep(current => Math.min(finalStep, current + 1));
@@ -93,31 +95,31 @@ export function ProfileForm({ person, profile, demo }: { person: Person; profile
     let cancelled = false;
     readCreationDraft(draftKey).then(({ draft, photo: storedPhoto }) => {
       if (cancelled || !draft) return;
-      setWhoAreYou(draft.whoAreYou); setLookingFor(draft.lookingFor); setDetails(draft.details);
+      setName(draft.name || person.name); setWhoAreYou(draft.whoAreYou); setLookingFor(draft.lookingFor); setDetails(draft.details);
       setSelected(draft.selected.map(item => item || undefined) as Item[]);
       setPrompts(draft.prompts.map(prompt => prompt || undefined));
-      setSelectedDescriptions(draft.selectedDescriptions); setStep(draft.step);
+      setSelectedDescriptions(draft.selectedDescriptions); setStep(plot ? Math.min(draft.step, 6) : draft.step);
       setUseAccountPhoto(draft.useAccountPhoto); setRemovePhoto(draft.removePhoto);
       setPhoto(storedPhoto);
       setPhotoUrl(storedPhoto ? URL.createObjectURL(storedPhoto) : draft.useAccountPhoto ? safeUrl(person.avatar) : undefined);
     }).catch(() => { if (!cancelled) setDraftLoadFailed(true); })
       .finally(() => { if (!cancelled) setDraftReady(true); });
     return () => { cancelled = true; };
-  }, [draftKey, wizard, person.avatar]);
+  }, [draftKey, wizard, person.avatar, person.name, plot]);
 
   useEffect(() => {
     if (!wizard || !draftReady || draftLoadFailed || draftCompleted.current) return;
     let current = true;
     setDraftStatus("saving");
     void saveCreationDraft(draftKey, {
-      version: 1, step, whoAreYou, lookingFor, details,
+      version: 1, name, step, whoAreYou, lookingFor, details,
       selected: Array.from(selected, item => item || null),
       prompts: Array.from(prompts, prompt => prompt ? { id: prompt.id, text: prompt.text, ...(prompt.author ? { author: prompt.author } : {}) } : null),
       selectedDescriptions, useAccountPhoto, removePhoto,
     }).then(() => { if (current) setDraftStatus("saved"); })
       .catch(() => { if (current) setDraftStatus("error"); });
     return () => { current = false; };
-  }, [wizard, draftReady, draftLoadFailed, draftKey, step, whoAreYou, lookingFor, details, selected, prompts, selectedDescriptions, useAccountPhoto, removePhoto]);
+  }, [wizard, draftReady, draftLoadFailed, draftKey, name, step, whoAreYou, lookingFor, details, selected, prompts, selectedDescriptions, useAccountPhoto, removePhoto]);
 
   useEffect(() => {
     if (!wizard || !draftReady || draftLoadFailed || draftCompleted.current) return;
@@ -152,8 +154,8 @@ export function ProfileForm({ person, profile, demo }: { person: Person; profile
   async function submit() {
     if (busy) return;
     if (!profile && !acceptedCreation) { setError("Please accept the profile creation note before continuing."); return; }
-    if (selected.filter(Boolean).length < 3 || prompts.some((prompt, index) => !prompt || !selected[index])) { setError("Choose at least three prompt-and-item pairs and complete every selection."); return; }
-    setError(""); const valid = profileInputSchema.safeParse(payload()); if (!valid.success) { setError(valid.error.issues[0].message); return; }
+    if (!plot && (selected.filter(Boolean).length < 3 || prompts.some((prompt, index) => !prompt || !selected[index]))) { setError("Choose at least three prompt-and-item pairs and complete every selection."); return; }
+    setError(""); const valid = (plot ? plotProfileInputSchema : profileInputSchema).safeParse(plot ? { ...payload(), name, selected: [] } : payload()); if (!valid.success) { setError(valid.error.issues[0].message); return; }
     if (demo) { setError("This is a preview. Connect the live directory before publishing."); return; }
     setBusy(true);
     try {
@@ -162,13 +164,13 @@ export function ProfileForm({ person, profile, demo }: { person: Person; profile
         const presign = await fetch("/api/upload", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ filename: photo.name, contentType: photo.type, size: photo.size }) }); const data = await presign.json(); if (!presign.ok) throw new Error(data.error);
         const uploaded = await fetch(data.upload_url, { method: "PUT", headers: { "Content-Type": data.content_type }, body: photo }); if (!uploaded.ok) throw new Error("The photo could not be uploaded. Try again."); key = data.key; proof = data.proof; setPhotoKey(key); setPhotoProof(proof);
       }
-      const response = await fetch("/api/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...valid.data, photoKey: key, photoProof: proof }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error);
+      const response = await fetch(plot ? "/api/plot/profile" : "/api/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...valid.data, photoKey: key, photoProof: proof }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error);
       if (wizard) {
         draftCompleted.current = true;
         await clearCreationDraft(draftKey).catch(() => {});
       }
       leaveBypass.current = true;
-      router.push(`/people/${data.channelId}`); router.refresh();
+      router.push(plot ? "/plot" : `/people/${data.channelId}`); router.refresh();
     } catch (e) { setError(e instanceof Error ? e.message : "Your profile could not be saved."); } finally { setBusy(false); }
   }
   if (wizard && !draftReady) return <p className="small muted" role="status">Restoring your draft…</p>;
@@ -176,12 +178,12 @@ export function ProfileForm({ person, profile, demo }: { person: Person; profile
     {profile && <ProfileVisibility channelId={profile.channel.id} hidden={profile.channel.metadata?.hidden === true} banner />}
     <p className="sr-only" role="status">{wizard ? `Profile step ${step + 1} of ${finalStep + 1}` : ""}</p>
     <fieldset disabled={busy} className="form-fieldset"><div className="profile-fields" inert={busy}>
-      <div className="profile-form-grid"><section hidden={wizard && step !== 0} data-profile-step="0"><div className="photo-control"><h2 className="info-title">Your photo</h2><button type="button" className="photo-drop" aria-label={photoUrl ? "Replace photo" : "Add a photo"} disabled={preview} onClick={() => fileInput.current?.click()}>{photoUrl ? <img src={photoUrl} alt="Your profile photo" /> : <span className="photo-plus" aria-hidden>＋</span>}</button><input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={e => { const file = e.target.files?.[0]; if (!file) return; if (file.size > 10 * 1024 * 1024) { setError("Choose a photo smaller than 10 MB."); return; } if (photoUrl?.startsWith("blob:")) URL.revokeObjectURL(photoUrl); setUseAccountPhoto(false); setPhoto(file); setPhotoKey(undefined); setPhotoUrl(URL.createObjectURL(file)); setRemovePhoto(false); }} />{!preview && <div className="photo-buttons"><button type="button" onClick={() => fileInput.current?.click()}>{photoUrl ? "Replace photo" : "Add a photo"}</button>{photoUrl && !useAccountPhoto && <button type="button" onClick={() => { if (photoUrl.startsWith("blob:")) URL.revokeObjectURL(photoUrl); const avatar = safeUrl(person.avatar); setUseAccountPhoto(Boolean(avatar)); setPhoto(undefined); setPhotoUrl(avatar); setPhotoKey(undefined); setRemovePhoto(!avatar); }}>Remove</button>}</div>}<p className="small muted photo-description">We use your Are.na profile photo by default. You can upload a different one.</p></div></section>
+      <div className="profile-form-grid"><section hidden={wizard && step !== 0} data-profile-step="0">{plot && <label className="field">Your name<input required maxLength={300} autoComplete="name" value={name} onChange={e => setName(e.target.value)} /></label>}<div className="photo-control"><h2 className="info-title">Your photo</h2><button type="button" className="photo-drop" aria-label={photoUrl ? "Replace photo" : "Add a photo"} disabled={preview} onClick={() => fileInput.current?.click()}>{photoUrl ? <img src={photoUrl} alt="Your profile photo" /> : <span className="photo-plus" aria-hidden>＋</span>}</button><input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={e => { const file = e.target.files?.[0]; if (!file) return; if (file.size > 10 * 1024 * 1024) { setError("Choose a photo smaller than 10 MB."); return; } if (photoUrl?.startsWith("blob:")) URL.revokeObjectURL(photoUrl); setUseAccountPhoto(false); setPhoto(file); setPhotoKey(undefined); setPhotoUrl(URL.createObjectURL(file)); setRemovePhoto(false); }} />{!preview && <div className="photo-buttons"><button type="button" onClick={() => fileInput.current?.click()}>{photoUrl ? "Replace photo" : "Add a photo"}</button>{photoUrl && !useAccountPhoto && <button type="button" onClick={() => { if (photoUrl.startsWith("blob:")) URL.revokeObjectURL(photoUrl); const avatar = safeUrl(person.avatar); setUseAccountPhoto(Boolean(avatar)); setPhoto(undefined); setPhotoUrl(avatar); setPhotoKey(undefined); setRemovePhoto(!avatar); }}>Remove</button>}</div>}{plot && <button type="button" onClick={() => { setPhoto(undefined); setPhotoKey(undefined); setPhotoProof(undefined); setPhotoUrl(undefined); setUseAccountPhoto(false); setRemovePhoto(true); nextStep(); }}>Skip photo →</button>}<p className="small muted photo-description">We use your Are.na profile photo by default. You can upload a different one.</p></div></section>
       <section className="profile-preferences"><fieldset hidden={wizard && step !== 1} data-profile-step="1" className="intentions"><legend>Open to</legend>{intentions.map(([value, label]) => <label key={value} className="check"><input type="checkbox" disabled={preview} checked={details.open_to.includes(value)} onChange={e => setDetails({ ...details, open_to: e.target.checked ? [...details.open_to, value] : details.open_to.filter(x => x !== value) })} />{label}</label>)}</fieldset><div hidden={wizard && step !== 2} data-profile-step="2">{preview ? <label className="field">City<span>{details.location.city}</span></label> : <LocationPicker value={details.location} onChange={location => setDetails({ ...details, location })} />}</div><fieldset hidden={wizard && step !== 3} data-profile-step="3" className="intentions location-preference"><legend>Where would you like to meet people?</legend><div className="meeting-options">{[{ label: "Local", local: true }, { label: "Anywhere", local: false }].map(option => <label className="check" key={option.label}><input type="radio" name="meeting-location" disabled={preview} checked={details.local_only === option.local} onChange={() => setDetails({ ...details, local_only: option.local })} />{option.label}</label>)}</div></fieldset></section>
       <section hidden={wizard && step !== 4} data-profile-step="4"><h2 className="profile-question-label">Who are you?</h2><textarea aria-label="Who are you?" className="looking-input" placeholder="Tell people a little about yourself…" maxLength={5000} required value={whoAreYou} onChange={e => setWhoAreYou(e.target.value)} /></section>
       <section hidden={wizard && step !== 5} data-profile-step="5"><h2 className="profile-question-label">What are you looking for?</h2>{preview ? <p className="preview-text">{lookingFor}</p> : <textarea aria-label="What are you looking for?" className="looking-input" placeholder="A conversation, a collaborator, something unexpected…" maxLength={5000} required value={lookingFor} onChange={e => setLookingFor(e.target.value)} />}</section>
 </div>
-      <section className="content-section">{promptError && <p role="alert" className="error">{promptError} <button type="button" className="quiet" onClick={() => setPromptRetry(value => value + 1)}>Retry prompts</button></p>}<div className="grid">{prompts.map((_, i) => <div key={selected[i] ? `${selected[i].type}:${selected[i].id}` : `empty:${i}`} hidden={wizard && step !== 6 + i} data-profile-step={6 + i} className="selected-slot"><SelectionPrompt prompt={prompts[i]} onSearch={preview ? undefined : () => setChoosingPrompt(i)} onRemix={preview ? undefined : () => remix(i)} onRemove={!preview && prompts.length > 3 ? () => {
+      <section hidden={plot} className="content-section">{promptError && <p role="alert" className="error">{promptError} <button type="button" className="quiet" onClick={() => setPromptRetry(value => value + 1)}>Retry prompts</button></p>}<div className="grid">{prompts.map((_, i) => <div key={selected[i] ? `${selected[i].type}:${selected[i].id}` : `empty:${i}`} hidden={wizard && step !== 6 + i} data-profile-step={6 + i} className="selected-slot"><SelectionPrompt prompt={prompts[i]} onSearch={preview ? undefined : () => setChoosingPrompt(i)} onRemix={preview ? undefined : () => remix(i)} onRemove={!preview && prompts.length > 3 ? () => {
       if (selected[i] && !window.confirm("Remove this prompt and its selected item?")) return;
       setPrompts(current => current.filter((_, index) => index !== i));
       setSelected(current => Array.from({ length: prompts.length }, (_, index) => current[index]).filter((_, index) => index !== i));

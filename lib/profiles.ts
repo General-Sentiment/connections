@@ -1,7 +1,7 @@
 import { profilePrompts } from "./prompts";
 import { locationMetadata, locationSchema } from "./locations";
 import { ArenaClient, ArenaError } from "./arena";
-import { blankDetails, parseDetails, profileInputSchema, serializeDetails } from "./details";
+import { blankDetails, parseDetails, plotProfileInputSchema, profileInputSchema, serializeDetails } from "./details";
 import type { Item, Profile, Person } from "./types";
 import { groupId } from "./config";
 import { withLock } from "./coordination";
@@ -35,7 +35,7 @@ export function assembleProfile(channel: Item, items: Item[], person: Person): P
     if (author?.name && author.slug) prompt.author = { name: author.name, slug: author.slug };
   }
   const selectedDescriptions = Object.fromEntries(items.filter(x => x.type === "Text" && roleOf(x) === "selected_description").map(x => [descriptionRef(x), x.content?.markdown || ""]));
-  return { selectedDescriptions, channel, person, whoAreYou: biography?.content?.markdown || "", biographyBlock: biography, lookingFor: description?.content?.markdown || "", details: parsed, selected, photo, profileLink: link, descriptionBlock: description, detailsBlock: details, warning };
+  return { selectedDescriptions, channel, person: typeof channel.metadata?.profile_name === "string" ? { ...person, name: channel.metadata.profile_name } : person, whoAreYou: biography?.content?.markdown || "", biographyBlock: biography, lookingFor: description?.content?.markdown || "", details: parsed, selected, photo, profileLink: link, descriptionBlock: description, detailsBlock: details, warning };
 }
 export async function readProfile(channelId: string | number, client = new ArenaClient(), knownChannel?: Item): Promise<Profile> {
   const [channel, contents] = await Promise.all([knownChannel || client.item("Channel", channelId), allItems(client, `/channels/${channelId}/contents`)]);
@@ -101,8 +101,9 @@ export async function deleteProfile(person: Person, token: string, channelId: nu
   });
 }
 
-export async function saveProfile(person: Person, token: string, raw: unknown) {
-  const input = profileInputSchema.parse(raw); const client = new ArenaClient(token);
+export async function saveProfile(person: Person, token: string, raw: unknown, plot = false) {
+  const parsed = plot ? plotProfileInputSchema.parse(raw) : profileInputSchema.parse(raw);
+  const input = { ...parsed, selected: parsed.selected as z.infer<typeof profileInputSchema>["selected"] }; const client = new ArenaClient(token);
   if (!groupId()) throw new Error("The directory has not been configured yet.");
   return withLock(`profile:${person.id}`, async () => {
     const verifiedSelections = await verifySelection(client, person, input.selected);
@@ -121,6 +122,7 @@ export async function saveProfile(person: Person, token: string, raw: unknown) {
     const group = await manager.request<{ can?: { manage_members?: boolean } }>(`/groups/${groupId()}`);
     if (!group.can?.manage_members) throw new Error("The directory's account needs to reconnect Are.na before profiles can be published.");
     let ref = await availableProfileRef(person.id, client);
+    if (plot && ref?.published) return { channelId: ref.channel_id };
     let channel: Item;
     if (ref) {
       channel = await manager.item("Channel", ref.channel_id);
@@ -182,7 +184,7 @@ export async function saveProfile(person: Person, token: string, raw: unknown) {
       displayOrder.push(selected.prompt ? arranged.find(item => roleOf(item) === "selected_prompt" && item.id === selected.prompt!.id) : undefined, arranged.find(item => roleOf(item) === "selected" && itemKey(item) === key), arranged.find(item => roleOf(item) === "selected_description" && descriptionRef(item) === key));
     }
     for (const item of displayOrder.reverse()) if (item?.connection) await client.request(`/connections/${item.connection.id}/move`, { method: "POST", body: { movement: "move_to_top" } });
-    await (userOwned ? client : manager).updateChannel(channel.id, { title: person.name, description: `https://www.are.na/${person.slug}`, metadata: { hidden: channel.metadata?.hidden === true, published: true, display_order: "position_desc", ...locationMetadata(input.details.location) } });
+    await (userOwned ? client : manager).updateChannel(channel.id, { title: "name" in parsed ? String(parsed.name) : (typeof channel.metadata?.profile_name === "string" ? channel.metadata.profile_name : person.name), description: `https://www.are.na/${person.slug}`, metadata: { ...channel.metadata, ...(plot ? { profile_name: "name" in parsed ? parsed.name : person.name, onboarding: "plot" } : {}), hidden: channel.metadata?.hidden === true, published: true, display_order: "position_desc", ...locationMetadata(input.details.location) } });
 
     return { channelId: channel.id };
   });

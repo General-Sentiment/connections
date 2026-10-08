@@ -13,6 +13,7 @@ const itemSchema = z.object({
   source: z.object({ url: z.string(), provider: z.object({ name: z.string() }).optional() }).nullable().optional(),
 });
 const draftSchema = z.object({
+  name: z.string().max(300).optional(),
   version: z.literal(1), step: z.number().int().nonnegative(),
   whoAreYou: z.string().max(5000), lookingFor: z.string().max(5000),
   details: z.object({
