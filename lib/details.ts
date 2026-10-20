@@ -1,3 +1,4 @@
+import { romanceSchema } from "./romance";
 import { unusedPrompts } from "./prompt-selection";
 import { locationSchema } from "./locations";
 import { parseDocument, stringify } from "yaml";
@@ -5,8 +6,8 @@ import { z } from "zod";
 
 export const intentions = [
   ["conversation", "Conversation"], ["friendship", "Friendship"],
-  ["creative_partnership", "Creative partnership"], ["romance", "Romance"],
-  ["meeting_new_people", "Meeting new people"], ["employment", "Employment"],
+  ["creative_partnership", "Creative partnership"],
+  ["meeting_new_people", "Meeting new people"], ["employment", "Employment"], ["romance", "Romance"],
 ] as const;
 export const promptSchema = z.object({ id: z.number().int().positive(), text: z.string().trim().min(1).max(2000), author: z.object({ name: z.string().min(1).max(300), slug: z.string().min(1).max(300) }).strict().optional() }).strict();
 export const detailsSchema = z.object({
@@ -14,6 +15,7 @@ export const detailsSchema = z.object({
   location: locationSchema,
   open_to: z.array(z.enum(intentions.map(([value]) => value))).min(1).max(intentions.length).refine(v => new Set(v).size === v.length, "Choose each intention once."),
   local_only: z.boolean(),
+  romance: romanceSchema.optional(),
   selected_prompts: z.record(z.string().regex(/^(Block|Channel):\d+$/), promptSchema).optional(),
 }).strict();
 export type Details = z.infer<typeof detailsSchema>;

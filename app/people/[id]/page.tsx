@@ -41,6 +41,12 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
         <div><dt>Location</dt><dd>{[profile.details.location.city, profile.details.location.country].filter(Boolean).join(", ") || "—"}</dd></div>
         <div><dt>Open to</dt><dd>{intentions.filter(([value]) => profile.details.open_to.includes(value)).map(([, label]) => label).join(", ") || "—"}</dd></div>
         <div><dt>Meeting preference</dt><dd>{profile.details.local_only ? "Prefer local" : "Open to anywhere"}</dd></div>
+        {([
+          ["Gender", profile.details.romance?.genders],
+          ["Sexuality", profile.details.romance?.sexualities],
+          ["Interested in — genders", profile.details.romance?.interested_in],
+          ["Interested in — sexualities", profile.details.romance?.interested_sexualities],
+        ] as const).map(([label, values]) => values?.length ? <div key={label}><dt>{label}</dt><dd>{values.join(", ")}</dd></div> : null)}
         <div><dt>Created</dt><dd><time dateTime={profile.channel.created_at}>{formatDate(profile.channel.created_at)}</time></dd></div>
         <div><dt>Last updated</dt><dd><time dateTime={profile.channel.updated_at}>{formatDate(profile.channel.updated_at)}</time></dd></div>
       </dl>

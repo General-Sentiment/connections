@@ -168,7 +168,7 @@ export function DesktopWindow({ children, logout }: { children: React.ReactNode;
           <button ref={fullscreenButton} className="window-dot window-dot-fullscreen" aria-label="Show app full screen" onClick={() => setFullscreen(true)}><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5h6M5 2v6" /></svg></button>
         </div>
         <div className="window-address">connections.forum<span>{pathname === "/" ? "" : pathname}</span></div>
-        <span className="window-chrome-spacer" aria-hidden />
+        {process.env.NODE_ENV === "development" && pathname === "/sandbox/onboarding" ? <span className="window-preview-note">LOCAL PREVIEW</span> : <span className="window-chrome-spacer" aria-hidden />}
       </header>
       {fullscreen && <button ref={exitFullscreenButton} className="exit-fullscreen" type="button" onClick={() => setFullscreen(false)}>Exit full screen</button>}
       <div className="window-viewport" ref={viewport}>

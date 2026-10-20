@@ -6,6 +6,11 @@ type Cached = { value: unknown; expires: number };
 const globalState = globalThis as typeof globalThis & { arenaRequests?: ReturnType<typeof createState> };
 function createState() { return { cache: new Map<string, Cached>(), pending: new Map<string, Promise<unknown>>(), cooldowns: new Map<string, number>(), generation: 0, active: 0, queue: [] as (() => void)[] }; }
 const state = globalState.arenaRequests ??= createState();
+export function publicArenaCache<T>(path: string): { value: T } | undefined {
+  const cached = state.cache.get(`public:${path}`);
+  return cached && cached.expires > Date.now() ? { value: structuredClone(cached.value) as T } : undefined;
+}
+export const arenaCacheGeneration = () => state.generation;
 async function slot() {
   if (state.active >= 3) await new Promise<void>(resolve => state.queue.push(resolve));
   else state.active++;

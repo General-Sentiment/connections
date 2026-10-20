@@ -1,4 +1,6 @@
 "use client";
+import { RomanceOptions } from "./romance-options";
+import { demoBlocks } from "@/lib/demo";
 import { useLeaveConfirmation } from "./use-leave-confirmation";
 import { ProfileVisibility } from "./profile-visibility";
 import { PromptPicker } from "./prompt-picker";
@@ -16,13 +18,13 @@ import { fillPrompts, unusedPrompts } from "@/lib/prompt-selection";
 import type { ProfilePrompt } from "@/lib/prompts";
 import { LocationPicker } from "./location-picker";
 import { clearCreationDraft, creationDraftKey, readCreationDraft, saveCreationDraft, saveCreationPhoto } from "@/lib/creation-draft";
-export function ProfileForm({ person, profile, demo, plot = false }: { person: Person; profile?: Profile; demo: boolean; plot?: boolean }) {
+export function ProfileForm({ person, profile, demo, plot = false, sandbox = false }: { person: Person; profile?: Profile; demo: boolean; plot?: boolean; sandbox?: boolean }) {
   const [choosingPrompt, setChoosingPrompt] = useState<number>();
   const [name, setName] = useState(person.name);
   const [step, setStep] = useState(0);
   const wizard = !profile;
   const draftKey = creationDraftKey(person.id, demo) + (plot ? ":plot" : "");
-  const [draftReady, setDraftReady] = useState(!wizard);
+  const [draftReady, setDraftReady] = useState(sandbox || !wizard);
   const [draftLoadFailed, setDraftLoadFailed] = useState(false);
   const [draftStatus, setDraftStatus] = useState("saving");
   const [photoStatus, setPhotoStatus] = useState("saving");
@@ -53,6 +55,11 @@ export function ProfileForm({ person, profile, demo, plot = false }: { person: P
   const [promptError, setPromptError] = useState("");
   const [promptRetry, setPromptRetry] = useState(0);
   useEffect(() => {
+    if (sandbox) {
+      const samples = ["What inspires you?", "What do you do on a day off?", "What are you getting better at?", "What are you curious about?"].map((text, index) => ({ id: index + 1, text }));
+      setPromptOptions(samples); setPrompts(previous => fillPrompts(samples, previous));
+      return;
+    }
     if (!draftReady || plot) return;
     const controller = new AbortController();
     setPromptError("");
@@ -65,7 +72,7 @@ export function ProfileForm({ person, profile, demo, plot = false }: { person: P
       if (fillPrompts(data.prompts, []).filter(Boolean).length < 3) setPromptError("The prompts channel needs at least three different questions.");
     }).catch(error => { if (!controller.signal.aborted) setPromptError(error.message); });
     return () => controller.abort();
-  }, [promptRetry, draftReady, plot]);
+  }, [promptRetry, draftReady, plot, sandbox]);
   function remix(index: number) {
     setPrompts(previous => {
       const choices = unusedPrompts(promptOptions, previous);
@@ -88,9 +95,10 @@ export function ProfileForm({ person, profile, demo, plot = false }: { person: P
   const [selectedDescriptions, setSelectedDescriptions] = useState<Record<string, string>>(profile?.selectedDescriptions || {});
   const editSnapshot = JSON.stringify({ whoAreYou, lookingFor, details, selected, selectedDescriptions, useAccountPhoto, removePhoto });
   const initialEditSnapshot = useRef(editSnapshot);
-  const leaveBypass = useLeaveConfirmation(wizard || Boolean(photo) || editSnapshot !== initialEditSnapshot.current);
+  const leaveBypass = useLeaveConfirmation(!sandbox && (wizard || Boolean(photo) || editSnapshot !== initialEditSnapshot.current));
 
   useEffect(() => {
+    if (sandbox) return;
     if (!wizard) { void clearCreationDraft(draftKey).catch(() => {}); return; }
     let cancelled = false;
     readCreationDraft(draftKey).then(({ draft, photo: storedPhoto }) => {
@@ -105,10 +113,10 @@ export function ProfileForm({ person, profile, demo, plot = false }: { person: P
     }).catch(() => { if (!cancelled) setDraftLoadFailed(true); })
       .finally(() => { if (!cancelled) setDraftReady(true); });
     return () => { cancelled = true; };
-  }, [draftKey, wizard, person.avatar, person.name, plot]);
+  }, [draftKey, wizard, person.avatar, person.name, plot, sandbox]);
 
   useEffect(() => {
-    if (!wizard || !draftReady || draftLoadFailed || draftCompleted.current) return;
+    if (sandbox || !wizard || !draftReady || draftLoadFailed || draftCompleted.current) return;
     let current = true;
     setDraftStatus("saving");
     void saveCreationDraft(draftKey, {
@@ -122,7 +130,7 @@ export function ProfileForm({ person, profile, demo, plot = false }: { person: P
   }, [wizard, draftReady, draftLoadFailed, draftKey, name, step, whoAreYou, lookingFor, details, selected, prompts, selectedDescriptions, useAccountPhoto, removePhoto]);
 
   useEffect(() => {
-    if (!wizard || !draftReady || draftLoadFailed || draftCompleted.current) return;
+    if (sandbox || !wizard || !draftReady || draftLoadFailed || draftCompleted.current) return;
     let current = true;
     setPhotoStatus("saving");
     void saveCreationPhoto(draftKey, photo).then(() => { if (current) setPhotoStatus("saved"); })
@@ -152,6 +160,7 @@ export function ProfileForm({ person, profile, demo, plot = false }: { person: P
     }
   }
   async function submit() {
+    if (sandbox) { setError("Preview complete. No profile was created."); return; }
     if (busy) return;
     if (!profile && !acceptedCreation) { setError("Please accept the profile creation note before continuing."); return; }
     if (!plot && (selected.filter(Boolean).length < 3 || prompts.some((prompt, index) => !prompt || !selected[index]))) { setError("Choose at least three prompt-and-item pairs and complete every selection."); return; }
@@ -179,7 +188,7 @@ export function ProfileForm({ person, profile, demo, plot = false }: { person: P
     <p className="sr-only" role="status">{wizard ? `Profile step ${step + 1} of ${finalStep + 1}` : ""}</p>
     <fieldset disabled={busy} className="form-fieldset"><div className="profile-fields" inert={busy}>
       <div className="profile-form-grid"><section hidden={wizard && step !== 0} data-profile-step="0">{plot && <label className="field">Your name<input required maxLength={300} autoComplete="name" value={name} onChange={e => setName(e.target.value)} /></label>}<div className="photo-control"><h2 className="info-title">Your photo</h2><button type="button" className="photo-drop" aria-label={photoUrl ? "Replace photo" : "Add a photo"} disabled={preview} onClick={() => fileInput.current?.click()}>{photoUrl ? <img src={photoUrl} alt="Your profile photo" /> : <span className="photo-plus" aria-hidden>＋</span>}</button><input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={e => { const file = e.target.files?.[0]; if (!file) return; if (file.size > 10 * 1024 * 1024) { setError("Choose a photo smaller than 10 MB."); return; } if (photoUrl?.startsWith("blob:")) URL.revokeObjectURL(photoUrl); setUseAccountPhoto(false); setPhoto(file); setPhotoKey(undefined); setPhotoUrl(URL.createObjectURL(file)); setRemovePhoto(false); }} />{!preview && <div className="photo-buttons"><button type="button" onClick={() => fileInput.current?.click()}>{photoUrl ? "Replace photo" : "Add a photo"}</button>{photoUrl && !useAccountPhoto && <button type="button" onClick={() => { if (photoUrl.startsWith("blob:")) URL.revokeObjectURL(photoUrl); const avatar = safeUrl(person.avatar); setUseAccountPhoto(Boolean(avatar)); setPhoto(undefined); setPhotoUrl(avatar); setPhotoKey(undefined); setRemovePhoto(!avatar); }}>Remove</button>}</div>}{plot && <button type="button" onClick={() => { setPhoto(undefined); setPhotoKey(undefined); setPhotoProof(undefined); setPhotoUrl(undefined); setUseAccountPhoto(false); setRemovePhoto(true); nextStep(); }}>Skip photo →</button>}<p className="small muted photo-description">We use your Are.na profile photo by default. You can upload a different one.</p></div></section>
-      <section className="profile-preferences"><fieldset hidden={wizard && step !== 1} data-profile-step="1" className="intentions"><legend>Open to</legend>{intentions.map(([value, label]) => <label key={value} className="check"><input type="checkbox" disabled={preview} checked={details.open_to.includes(value)} onChange={e => setDetails({ ...details, open_to: e.target.checked ? [...details.open_to, value] : details.open_to.filter(x => x !== value) })} />{label}</label>)}</fieldset><div hidden={wizard && step !== 2} data-profile-step="2">{preview ? <label className="field">City<span>{details.location.city}</span></label> : <LocationPicker value={details.location} onChange={location => setDetails({ ...details, location })} />}</div><fieldset hidden={wizard && step !== 3} data-profile-step="3" className="intentions location-preference"><legend>Where would you like to meet people?</legend><div className="meeting-options">{[{ label: "Local", local: true }, { label: "Anywhere", local: false }].map(option => <label className="check" key={option.label}><input type="radio" name="meeting-location" disabled={preview} checked={details.local_only === option.local} onChange={() => setDetails({ ...details, local_only: option.local })} />{option.label}</label>)}</div></fieldset></section>
+      <section className="profile-preferences"><fieldset hidden={wizard && step !== 1} data-profile-step="1" className="intentions"><legend>Open to</legend>{intentions.map(([value, label]) => <div key={value}><label className="check"><input type="checkbox" disabled={preview} checked={details.open_to.includes(value)} onChange={e => setDetails({ ...details, open_to: e.target.checked ? [...details.open_to, value] : details.open_to.filter(x => x !== value), ...(value === "romance" && !e.target.checked ? { romance: undefined } : {}) })} />{label}</label>{value === "romance" && details.open_to.includes("romance") && <RomanceOptions value={details.romance} disabled={preview} onChange={romance => setDetails({ ...details, romance })} />}</div>)}</fieldset><div hidden={wizard && step !== 2} data-profile-step="2">{preview ? <label className="field">City<span>{details.location.city}</span></label> : <LocationPicker value={details.location} onChange={location => setDetails({ ...details, location })} />}</div><fieldset hidden={wizard && step !== 3} data-profile-step="3" className="intentions location-preference"><legend>Where would you like to meet people?</legend><div className="meeting-options">{[{ label: "Local", local: true }, { label: "Anywhere", local: false }].map(option => <label className="check" key={option.label}><input type="radio" name="meeting-location" disabled={preview} checked={details.local_only === option.local} onChange={() => setDetails({ ...details, local_only: option.local })} />{option.label}</label>)}</div></fieldset></section>
       <section hidden={wizard && step !== 4} data-profile-step="4"><h2 className="profile-question-label">Who are you?</h2><textarea aria-label="Who are you?" className="looking-input" placeholder="Tell people a little about yourself…" maxLength={5000} required value={whoAreYou} onChange={e => setWhoAreYou(e.target.value)} /></section>
       <section hidden={wizard && step !== 5} data-profile-step="5"><h2 className="profile-question-label">What are you looking for?</h2>{preview ? <p className="preview-text">{lookingFor}</p> : <textarea aria-label="What are you looking for?" className="looking-input" placeholder="A conversation, a collaborator, something unexpected…" maxLength={5000} required value={lookingFor} onChange={e => setLookingFor(e.target.value)} />}</section>
 </div>
@@ -188,8 +197,8 @@ export function ProfileForm({ person, profile, demo, plot = false }: { person: P
       setPrompts(current => current.filter((_, index) => index !== i));
       setSelected(current => Array.from({ length: prompts.length }, (_, index) => current[index]).filter((_, index) => index !== i));
       setRevealed(undefined);
-    } : undefined} disabled={busy || unusedPrompts(promptOptions, prompts).length === 0} />{selected[i] ? <><div className={`selected-block${revealed === i ? " revealed" : ""}`}><CardFace item={selected[i]} />{!preview && <><button type="button" className="selected-reveal" aria-label={`Show actions for ${selected[i].title || "block"}`} aria-expanded={revealed === i} onClick={() => setRevealed(revealed === i ? undefined : i)} /><button type="button" className="selected-replace" onClick={() => { setReplacing(i); setPicker(true); }}>Replace</button></>}</div><div className="selected-controls">{selected[i].type !== "Channel" && <span title={selected[i].title || ""}>{selected[i].title}</span>}</div><div className="field selected-description-field"><textarea aria-label={`Description for ${selected[i].title || "selected item"}`} maxLength={5000} rows={5} placeholder="Say more?" value={selectedDescriptions[itemKey(selected[i])] || ""} onChange={e => setSelectedDescriptions({ ...selectedDescriptions, [itemKey(selected[i])]: e.target.value })} /></div></> : <button type="button" className="add-square" onClick={() => { setReplacing(i); setPicker(true); }} aria-label={`Choose selected item ${i + 1}`}><span>＋</span><span>Choose a block or channel</span></button>}</div>)}</div><div hidden={wizard && step !== 6 + prompts.length} data-profile-step={6 + prompts.length}>{!preview && <button type="button" className="add-prompt-button" disabled={busy || unusedPrompts(promptOptions, prompts).length === 0} onClick={() => setPrompts(current => { const choices = unusedPrompts(promptOptions, current); return choices.length ? [...current, choices[Math.floor(Math.random() * choices.length)]] : current; })}>Add another block <span aria-hidden="true">＋</span></button>}</div></section>
-      </div>{error && <p role="alert" className="notice error">{error}</p>}<div className="form-submit" hidden={wizard && step !== finalStep} data-profile-step={finalStep}>{!profile && <div className="creation-consent"><p className="small muted">Creating your profile creates a public Are.na channel owned by the Connections group. You can edit it through your account. It will be visible on Connections and Are.na. When you connect with someone, your conversation happens in a private Are.na channel shared by the two of you. The Connections group has no access to that channel.</p><label className="check"><input type="checkbox" required checked={acceptedCreation} disabled={busy} onChange={e => setAcceptedCreation(e.target.checked)} /><span>I understand and agree.</span></label></div>}<div>{preview && <button type="button" onClick={() => setPreview(false)}>Back to editing</button>}<button className="profile-primary" type="submit" disabled={busy} aria-live="polite">{deleting ? "Deleting profile…" : busy ? profile ? "Saving profile…" : "Creating profile…" : profile ? "Save profile" : "Create profile"}</button>{profile && <section className="profile-visibility-section" aria-label="Profile visibility"><div className="profile-visibility-buttons"><ProfileVisibility channelId={profile.channel.id} hidden={profile.channel.metadata?.hidden === true} /><button className="delete-profile" type="button" disabled={busy} onClick={() => void deleteCurrentProfile()}>Delete profile</button></div></section>}</div></div>
+    } : undefined} disabled={busy || unusedPrompts(promptOptions, prompts).length === 0} />{selected[i] ? <><div className={`selected-block${revealed === i ? " revealed" : ""}`}><CardFace item={selected[i]} />{!preview && <><button type="button" className="selected-reveal" aria-label={`Show actions for ${selected[i].title || "block"}`} aria-expanded={revealed === i} onClick={() => setRevealed(revealed === i ? undefined : i)} /><button type="button" className="selected-replace" onClick={() => { if (sandbox) { setSelected(current => { const next = current.slice(); next[i] = demoBlocks[i % demoBlocks.length]; return next; }); return; } setReplacing(i); setPicker(true); }}>Replace</button></>}</div><div className="selected-controls">{selected[i].type !== "Channel" && <span title={selected[i].title || ""}>{selected[i].title}</span>}</div><div className="field selected-description-field"><textarea aria-label={`Description for ${selected[i].title || "selected item"}`} maxLength={5000} rows={5} placeholder="Say more?" value={selectedDescriptions[itemKey(selected[i])] || ""} onChange={e => setSelectedDescriptions({ ...selectedDescriptions, [itemKey(selected[i])]: e.target.value })} /></div></> : <button type="button" className="add-square" onClick={() => { if (sandbox) { setSelected(current => { const next = current.slice(); next[i] = demoBlocks[i % demoBlocks.length]; return next; }); return; } setReplacing(i); setPicker(true); }} aria-label={`Choose selected item ${i + 1}`}><span>＋</span><span>Choose a block or channel</span></button>}</div>)}</div><div hidden={wizard && step !== 6 + prompts.length} data-profile-step={6 + prompts.length}>{!preview && <button type="button" className="add-prompt-button" disabled={busy || unusedPrompts(promptOptions, prompts).length === 0} onClick={() => setPrompts(current => { const choices = unusedPrompts(promptOptions, current); return choices.length ? [...current, choices[Math.floor(Math.random() * choices.length)]] : current; })}>Add another block <span aria-hidden="true">＋</span></button>}</div></section>
+      </div>{error && <p role="alert" className="notice error">{error}</p>}<div className="form-submit" hidden={wizard && step !== finalStep} data-profile-step={finalStep}>{!profile && <div className="creation-consent"><p className="small muted">Creating your profile creates a public Are.na channel owned by the Connections group. You can edit it through your account. It will be visible on Connections and Are.na. When you connect with someone, your conversation happens in a private Are.na channel shared by the two of you. The Connections group has no access to that channel.</p><label className="check"><input type="checkbox" required checked={acceptedCreation} disabled={busy} onChange={e => setAcceptedCreation(e.target.checked)} /><span>I understand and agree.</span></label></div>}<div>{preview && <button type="button" onClick={() => setPreview(false)}>Back to editing</button>}<button className="profile-primary" type="submit" disabled={busy} aria-live="polite">{deleting ? "Deleting profile…" : busy ? profile ? "Saving profile…" : "Creating profile…" : profile ? "Save profile" : sandbox ? "Finish preview" : "Create profile"}</button>{profile && <section className="profile-visibility-section" aria-label="Profile visibility"><div className="profile-visibility-buttons"><ProfileVisibility channelId={profile.channel.id} hidden={profile.channel.metadata?.hidden === true} /><button className="delete-profile" type="button" disabled={busy} onClick={() => void deleteCurrentProfile()}>Delete profile</button></div></section>}</div></div>
     </fieldset>{wizard && <nav className="profile-step-nav" aria-label="Profile steps"><button type="button" disabled={busy || step === 0} onClick={() => { setError(""); setStep(current => current - 1); }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7" /></svg>Back</button>{step < finalStep ? <button type="button" className="profile-primary" onClick={nextStep}>Next<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14m-7-7 7 7-7 7" /></svg></button> : <span />}</nav>}{picker && replacing !== undefined && <ItemPicker selected={selected.filter((item, i) => item && i !== replacing)} onChange={setSelected} prompt={prompts[replacing]} onRemix={() => remix(replacing)} remixDisabled={unusedPrompts(promptOptions, prompts).length === 0} onReplace={item => { const index = replacing; requestAnimationFrame(() => formRef.current?.querySelector<HTMLElement>(`[data-sort-index="${index}"] .selected-reveal`)?.focus()); setSelected(current => { const next = current.slice(); next[replacing] = item; return next; }); setPicker(false); setReplacing(undefined); setRevealed(undefined); }} onClose={() => { setPicker(false); setReplacing(undefined); }} />}
 
     {choosingPrompt !== undefined && <PromptPicker prompts={unusedPrompts(promptOptions, prompts.filter((_, index) => index !== choosingPrompt))} onClose={() => setChoosingPrompt(undefined)} onSelect={prompt => { setPrompts(current => current.map((value, index) => index === choosingPrompt ? prompt : value)); setChoosingPrompt(undefined); }} />}

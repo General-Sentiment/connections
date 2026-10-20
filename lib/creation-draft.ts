@@ -1,3 +1,4 @@
+import { romanceSchema } from "./romance";
 import { z } from "zod";
 import { intentions, promptSchema } from "./details";
 
@@ -19,7 +20,7 @@ const draftSchema = z.object({
   details: z.object({
     schema: z.literal("connections_profile"), version: z.literal(1),
     location: z.object({ city: z.string().max(100), country: z.string().max(100), id: z.string().optional(), region: z.string().optional(), country_code: z.string().optional() }),
-    open_to: z.array(z.enum(intentions.map(([value]) => value))), local_only: z.boolean(),
+    open_to: z.array(z.enum(intentions.map(([value]) => value))), local_only: z.boolean(), romance: romanceSchema.optional(),
   }),
   selected: z.array(itemSchema.nullable()), prompts: z.array(promptSchema.nullable()).min(3),
   selectedDescriptions: z.record(z.string(), z.string().max(5000)),
