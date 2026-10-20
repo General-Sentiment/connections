@@ -1,13 +1,23 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { bestMatches, matchKey, type LocationLevel, type Match } from "@/lib/matching";
+import { useEffect, useRef, useState } from "react";
+import { pairEveryone, bestMatches, matchKey, type LocationLevel, type Match } from "@/lib/matching";
 import { intentions } from "@/lib/details";
 import type { Profile } from "@/lib/types";
 import { fetchMatchProfiles } from "@/lib/fetch-match-profiles";
+import { PairingTable } from "./pairing-table";
 import { ProfileCard } from "./profile-card";
 
-export function MatchPicker({ selfId }: { selfId?: number }) {
+export function MatchPicker({ selfId, everyone = false, publishPlot = false }: { selfId?: number; everyone?: boolean; publishPlot?: boolean }) {
+  const [batch, setBatch] = useState<ReturnType<typeof pairEveryone>>();
+  useEffect(() => {
+    if (!publishPlot) return;
+    const clear = () => setBatch(undefined);
+    window.addEventListener("plot-round-selected", clear);
+    return () => window.removeEventListener("plot-round-selected", clear);
+  }, [publishPlot]);
+  const [checkedInOnly, setCheckedInOnly] = useState(true);
+  const [romanticPreferences, setRomanticPreferences] = useState(true);
   const [romantic, setRomantic] = useState(false);
   const [onlyMe, setOnlyMe] = useState(false);
   const seenRef = useRef(new Set<string>());
@@ -16,6 +26,14 @@ export function MatchPicker({ selfId }: { selfId?: number }) {
   const busy = useRef(false);
   const [progress, setProgress] = useState("");
   const [loading, setLoading] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!loading) return;
+    const started = Date.now(); setElapsed(0);
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [loading]);
+  const counts = progress.match(/(\d+) of (\d+) profiles/);
   const [error, setError] = useState("");
   const [skipped, setSkipped] = useState(0);
   const [requireLocation, setRequireLocation] = useState(false);
@@ -24,12 +42,13 @@ export function MatchPicker({ selfId }: { selfId?: number }) {
   async function findMatch() {
     if (busy.current) return;
     busy.current = true;
+    setBatch(undefined);
     setLoading(true); setError(""); setProgress("Loading profiles and preferences…");
     const minimum = new Promise<void>(resolve => setTimeout(resolve, 5000));
     try {
       const load = async () => {
-        if (profilesRef.current) { setProgress("Finding a pair…"); return profilesRef.current; }
-        const result = await fetchMatchProfiles(setProgress);
+        if (profilesRef.current && !publishPlot) { setProgress("Finding a pair…"); return profilesRef.current; }
+        const result = await fetchMatchProfiles(setProgress, publishPlot && checkedInOnly);
         profilesRef.current = result.profiles;
         setSkipped(result.skipped);
         return result.profiles as Profile[];
@@ -42,14 +61,30 @@ export function MatchPicker({ selfId }: { selfId?: number }) {
       }
       if (onlyMe && !profiles.some(profile => profile.person.id === selfId)) {
         setMatch(undefined);
-        setError("Publish a visible profile before matching yourself.");
+        setError("Publish a visible profile before pairing yourself.");
         return;
       }
       try {
         const stored: unknown = JSON.parse(sessionStorage.getItem(historyKey) || "[]");
         if (Array.isArray(stored)) for (const key of stored) if (typeof key === "string") seenRef.current.add(key);
       } catch { /* Keep in-memory history when browser storage is unavailable. */ }
-      const pool = bestMatches(profiles, requireLocation ? level : undefined, { selfId: onlyMe ? selfId : undefined, seen: seenRef.current, romantic });
+      if (everyone) {
+        let result: ReturnType<typeof pairEveryone>;
+        if (publishPlot) {
+          setProgress("Saving the round and revealing pairings on Plot…");
+          const response = await fetch("/api/plot/pairings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(requireLocation ? { location: level } : {}), romantic, romanticPreferences, checkedInOnly }) });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "The Plot round could not be published.");
+          result = { pairs: data.pairs, unpaired: data.unpaired };
+          setSkipped(data.skipped || 0);
+          window.dispatchEvent(new Event("plot-round-published"));
+        } else result = pairEveryone(profiles, requireLocation ? level : undefined, { seen: seenRef.current, romantic, romanticPreferences });
+        for (const pair of result.pairs) seenRef.current.add(matchKey(pair.first.person.id, pair.second.person.id));
+        try { sessionStorage.setItem(historyKey, JSON.stringify([...seenRef.current])); } catch { /* Keep in-memory history. */ }
+        setBatch(result);
+        return;
+      }
+      const pool = bestMatches(profiles, requireLocation ? level : undefined, { selfId: onlyMe ? selfId : undefined, seen: seenRef.current, romantic, romanticPreferences });
       if (!pool.length) {
         setMatch(undefined);
         setError("No unseen eligible pairs remain for these settings. Try changing your filters.");
@@ -62,28 +97,31 @@ export function MatchPicker({ selfId }: { selfId?: number }) {
     } catch (cause) {
       await minimum;
       setMatch(undefined);
-      setError(cause instanceof Error ? cause.message : "Matching failed. Try again.");
+      setError(cause instanceof Error ? cause.message : "Pairing failed. Try again.");
     } finally {
       busy.current = false; setLoading(false);
     }
   }
   return <>
-    <p className="muted">Pair two people with the most shared “Open to” preferences. Equally strong pairs are picked at random. Pairs won’t repeat during this browser session.</p>
+    <p className="muted pair-introduction">{everyone ? "Include everyone, prioritizing shared “Open to” preferences. Fallback introductions are labeled; with an odd count, one person participates twice." : "Pair two people with the most shared “Open to” preferences."} Equally strong pairs are picked at random. {everyone ? "Previous pairs are avoided when possible." : "Pairs won’t repeat during this session."}</p>
+    {publishPlot && <p className="small muted">Pair saves and reveals a round on Plot. Choose whether to include only checked-in people or everyone with a published, visible profile.</p>}
     <form className="match-controls" onSubmit={event => { event.preventDefault(); findMatch(); }}>
-      <label className="check"><input type="checkbox" disabled={loading || selfId === undefined} checked={onlyMe} onChange={event => { setOnlyMe(event.target.checked); setMatch(undefined); setError(""); }} />Only match me</label>
-      <label className="check"><input type="checkbox" disabled={loading} checked={romantic} onChange={event => { setRomantic(event.target.checked); setMatch(undefined); setError(""); }} />Match for romance</label>
-      {romantic && <p className="small muted">Both people must be open to romance and have completed their gender and sexuality details. Both people’s gender and sexuality preferences must be satisfied. Combine with “Only match me” to use your preferences.</p>}
+      {publishPlot && <label className="check"><input type="checkbox" disabled={loading} checked={checkedInOnly} onChange={event => { setCheckedInOnly(event.target.checked); setBatch(undefined); setError(""); }} />Limit to checked-in people</label>}
+      {!everyone && <label className="check"><input type="checkbox" disabled={loading || selfId === undefined} checked={onlyMe} onChange={event => { setOnlyMe(event.target.checked); setMatch(undefined); setError(""); }} />Only pair me</label>}
+      <label className="check"><input type="checkbox" disabled={loading} checked={romantic} onChange={event => { setRomantic(event.target.checked); setMatch(undefined); setError(""); }} />Pair for romance</label>
+      {romantic && <div className="pair-romance-options"><label className="check"><input type="checkbox" disabled={loading} checked={romanticPreferences} onChange={event => { setRomanticPreferences(event.target.checked); setMatch(undefined); setError(""); }} />Pair based on romantic preferences</label><p className="small muted">{romanticPreferences ? "Requires gender and sexuality details and mutual compatibility with both people’s Interested in selections." : "Pairs people who are open to romance, without filtering by gender, sexuality, or Interested in selections."}</p></div>}
       <label className="check"><input type="checkbox" disabled={loading} checked={requireLocation} onChange={event => { setRequireLocation(event.target.checked); setMatch(undefined); }} />Require the same location</label>
-      <label className="field">Match location by<select value={level} disabled={loading || !requireLocation} onChange={event => { setLevel(event.target.value as LocationLevel); setMatch(undefined); }}><option value="city">City</option><option value="state">State / region</option><option value="country">Country</option></select></label>
-      <button type="submit" disabled={loading}>{loading ? "Matching…" : "Match"}</button>
+      <fieldset className="match-location-options" disabled={loading || !requireLocation}><legend>Pair location by</legend><div>{([['city', 'City'], ['state', 'State / region'], ['country', 'Country']] as const).map(([value, label]) => <label className="check" key={value}><input type="radio" name="match-location-level" value={value} checked={level === value} onChange={() => { setLevel(value); setMatch(undefined); setError(""); }} />{label}</label>)}</div></fieldset>
+      <button type="submit" disabled={loading}>{loading ? "Pairing…" : "Pair"}</button>
       <p className="small muted">People who selected “local only” are always paired within their city. Missing location details don’t count as a shared location.</p>
     </form>
     <div aria-live="polite" aria-busy={loading}>
-      {loading && <p role="status" className="muted">Matching… {progress}</p>}
+      {loading && <div className="pair-loading" role="status"><p>Pairing… <span className="muted">{elapsed}s elapsed</span></p><p className="muted">{progress}</p>{counts ? <progress aria-label="Profiles checked" value={Number(counts[1])} max={Number(counts[2])} /> : <progress aria-label="Loading profiles" />}<p className="small muted">The first scan loads everyone’s preferences from Are.na. Later rounds reuse loaded profiles.</p></div>}
       {error && <p role="alert" className="notice error">{error}</p>}
-      {!loading && skipped > 0 && <p className="small muted">Some unavailable or incomplete profiles were left out of matching.</p>}
+      {!loading && skipped > 0 && <p className="small muted">{skipped} unavailable or private {skipped === 1 ? "profile was" : "profiles were"} left out. Readable profiles with missing preferences can receive general introductions.</p>}
       {!loading && match === null && <p className="empty">No eligible pairs found. Try a broader location or turn off the location requirement.</p>}
-      {!loading && match && <section aria-label="Matched pair"><h2>{match.shared.length} shared {match.shared.length === 1 ? "preference" : "preferences"}</h2><p>{match.shared.length ? intentions.filter(([value]) => match.shared.includes(value)).map(([, label]) => label).join(" · ") : "No shared preferences yet — this pair was chosen at random."}</p>{Boolean(match.sharedSexualities?.length) && <p className="small muted">Shared sexuality: {match.sharedSexualities!.join(", ")}</p>}<div className="match-pair">{[match.first, match.second].map(profile => <div key={profile.person.id}><ProfileCard item={profile.channel} profile={profile} /><p className="small muted">{[profile.details.location.city, profile.details.location.region, profile.details.location.country].filter(Boolean).join(", ")}</p></div>)}</div></section>}
+      {!loading && batch && <PairingTable pairs={batch.pairs} unpaired={batch.unpaired} location={requireLocation ? level === "state" ? "state / region" : level : undefined} romanticPreferences={romantic && romanticPreferences} />}
+      {!loading && match && <section aria-label="Selected pair"><h2>{match.shared.length} shared {match.shared.length === 1 ? "preference" : "preferences"}</h2><p>{match.shared.length ? intentions.filter(([value]) => match.shared.includes(value)).map(([, label]) => label).join(" · ") : "No shared preferences yet — this pair was chosen at random."}</p>{Boolean(match.sharedSexualities?.length) && <p className="small muted">Shared sexuality: {match.sharedSexualities!.join(", ")}</p>}<div className="match-pair">{[match.first, match.second].map(profile => <div key={profile.person.id}><ProfileCard item={profile.channel} profile={profile} /><p className="small muted">{[profile.details.location.city, profile.details.location.region, profile.details.location.country].filter(Boolean).join(", ")}</p></div>)}</div></section>}
     </div>
   </>;
 }

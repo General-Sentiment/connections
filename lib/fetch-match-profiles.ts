@@ -1,10 +1,10 @@
 import type { Profile } from "./types";
 type Result = { profiles: Profile[]; skipped: number };
-export async function fetchMatchProfiles(onProgress: (message: string) => void): Promise<Result> {
+export async function fetchMatchProfiles(onProgress: (message: string) => void, checkedInOnly = false): Promise<Result> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10 * 60 * 1000);
   try {
-    const response = await fetch("/api/match/profiles", { cache: "no-store", signal: controller.signal });
+    const response = await fetch(checkedInOnly ? "/api/match/profiles?checkedInOnly=true" : "/api/match/profiles", { cache: "no-store", signal: controller.signal });
     if (!response.ok || !response.headers.get("content-type")?.includes("application/x-ndjson")) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Profiles couldn’t be loaded. Try again.");
@@ -23,7 +23,8 @@ export async function fetchMatchProfiles(onProgress: (message: string) => void):
           const event = JSON.parse(line);
           if (event.status === "error") throw new Error(event.error);
           if (event.status === "complete") return { profiles: event.profiles, skipped: event.skipped };
-          if (typeof event.total === "number") onProgress(`Loading preferences: ${event.loaded} of ${event.total} profiles checked…`);
+          if (event.message) onProgress(event.message);
+          else if (typeof event.total === "number" && event.total > 0) onProgress(`Loading preferences: ${event.loaded} of ${event.total} profiles checked…`);
         }
         if (done) throw new Error("The profile request ended before loading finished. Try again.");
       }

@@ -2,7 +2,7 @@ export type Metadata = Record<string, string | number | boolean | null>;
 export type Person = { id: number; type: "User"; name: string; slug: string; avatar?: string | null; tier?: string };
 export type Owner = Person | { id: number; type: "Group"; name: string; slug: string };
 export type Markdown = { markdown: string; plain: string; html?: string };
-export type ArenaConnection = { id: number; position: number; metadata?: Metadata | null; connected_at: string; connected_by: Person };
+export type ArenaConnection = { id: number; position: number; pinned?: boolean; metadata?: Metadata | null; connected_at: string; connected_by: Person };
 export type Item = {
   id: number; type: "Channel" | "Text" | "Image" | "Link" | "Embed" | "Attachment" | "Pending";
   base_type?: "Block"; title: string | null; slug?: string; visibility: string; state: string;

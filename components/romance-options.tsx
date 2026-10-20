@@ -11,6 +11,6 @@ export function RomanceOptions({ value, onChange, disabled }: { value?: Romance;
     {choices("sexualities", "Your sexuality", sexualities)}
     {choices("interested_in", "Interested in — genders", genders)}
     {choices("interested_sexualities", "Interested in — sexualities", sexualities)}
-    <p className="small muted">Leave either “Interested in” group blank for no restriction on that group. Romantic matches respect both people’s selections.</p>
+    <p className="small muted">Leave either “Interested in” group blank for no restriction on that group. Romantic pairings respect both people’s selections.</p>
   </div>;
 }

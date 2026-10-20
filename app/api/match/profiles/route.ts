@@ -1,3 +1,5 @@
+import { NextRequest } from "next/server";
+import { plotAttendeesChannel } from "@/lib/plot-pairings";
 import { groupId, isDemo } from "@/lib/config";
 import { demoProfiles } from "@/lib/demo";
 import { getSession } from "@/lib/session";
@@ -5,11 +7,11 @@ import { apiError, privateJson } from "@/lib/http";
 import { loadMatchProfiles } from "@/lib/match-profiles";
 import { ArenaError } from "@/lib/arena";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     if (isDemo()) return privateJson({ profiles: demoProfiles, skipped: 0 });
     const session = await getSession();
-    if (!session?.token || !session.person) throw new ArenaError(401, "Log in to match profiles.");
+    if (!session?.token || !session.person) throw new ArenaError(401, "Log in to pair profiles.");
     const group = groupId();
     if (!group) throw new ArenaError(503, "The directory is being set up. Try again later.");
     const encoder = new TextEncoder();
@@ -22,7 +24,7 @@ export async function GET() {
         send({ status: "loading" });
         const heartbeat = setInterval(() => send({ status: "loading" }), 10000);
         try {
-          const result = await loadMatchProfiles(group, (loaded, total) => send({ status: "loading", loaded, total }));
+          const result = await loadMatchProfiles(group, (loaded, total, message) => send({ status: "loading", loaded, total, message }), session.token, request.nextUrl.searchParams.get("checkedInOnly") === "true" ? plotAttendeesChannel() : undefined);
           send({ status: "complete", ...result });
         } catch (error) {
           send({ status: "error", error: error instanceof Error ? error.message : "Profiles couldn’t be loaded. Try again." });

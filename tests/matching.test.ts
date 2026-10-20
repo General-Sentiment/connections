@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bestMatches, sameLocation } from "../lib/matching";
+import { pairEveryone, bestMatches, sameLocation } from "../lib/matching";
 import { demoProfiles } from "../lib/demo";
 import type { Profile } from "../lib/types";
 function profile(id: number, choices: Profile["details"]["open_to"], location = { city: "Los Angeles", region: "California", country: "United States", country_code: "US" }) : Profile {
@@ -76,4 +76,32 @@ it("romance mode checks sexuality preferences mutually and requires completed id
   expect(bestMatches([a, b], undefined, { romantic: true })).toHaveLength(1);
   b.details.open_to = ["friendship"];
   expect(bestMatches([a, b], undefined, { romantic: true })).toEqual([]);
+});
+
+it("can match people open to romance without applying the secondary preference filter", () => {
+  const a = profile(1, ["romance"]); const b = profile(2, ["romance"]);
+  expect(bestMatches([a, b], undefined, { romantic: true, romanticPreferences: false })).toHaveLength(1);
+  expect(bestMatches([a, b], undefined, { romantic: true, romanticPreferences: true })).toEqual([]);
+  b.details.open_to = ["friendship"];
+  expect(bestMatches([a, b], undefined, { romantic: true, romanticPreferences: false })).toEqual([]);
+});
+
+it("includes odd people using one additional pair and avoids prior pairs when possible", () => {
+  const profiles = [1, 2, 3, 4, 5].map(id => profile(id, ["friendship"]));
+  const first = pairEveryone(profiles, undefined, {}, () => 0);
+  expect(first.pairs).toHaveLength(3);
+  expect(first.unpaired).toHaveLength(0);
+  const ids = first.pairs.flatMap(pair => [pair.first.person.id, pair.second.person.id]);
+  expect(new Set(ids).size).toBe(5);
+  const seen = new Set(first.pairs.map(pair => [pair.first.person.id, pair.second.person.id].sort((a, b) => a - b).join(":")));
+  const next = pairEveryone(profiles, undefined, { seen }, () => 0);
+  expect(next.pairs.every(pair => !seen.has([pair.first.person.id, pair.second.person.id].sort((a, b) => a - b).join(":")))).toBe(true);
+});
+
+it("includes everyone with labeled general introductions when filters cannot be met", () => {
+  const profiles = [1, 2, 3, 4].map(id => profile(id, ["friendship"]));
+  const result = pairEveryone(profiles, undefined, { romantic: true }, () => 0);
+  expect(result.pairs).toHaveLength(2);
+  expect(result.unpaired).toEqual([]);
+  expect(result.pairs.every(pair => pair.fallback && !pair.shared.includes("romance"))).toBe(true);
 });

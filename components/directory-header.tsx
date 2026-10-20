@@ -5,7 +5,7 @@ import { isDemo } from "@/lib/config";
 import { ArenaButton } from "./arena-button";
 import Link from "@/components/app-link";
 
-export async function DirectoryHeader({ active, arenaHref, hasProfile }: { active: "prompts" | "profiles" | "connections" | "match"; arenaHref?: string; hasProfile?: boolean }) {
+export async function DirectoryHeader({ active, arenaHref, hasProfile }: { active: "prompts" | "profiles" | "connections" | "pair"; arenaHref?: string; hasProfile?: boolean }) {
   return <header className="page-heading directory-heading"><nav aria-label="Main navigation"><h1>
     <Link href="/" className={active === "profiles" ? "heading-current" : "heading-parent"} aria-current={active === "profiles" ? "page" : undefined}>Profiles</Link>
     <span className="slash" aria-hidden="true">•</span>
