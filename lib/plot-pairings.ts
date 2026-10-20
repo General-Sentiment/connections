@@ -50,7 +50,10 @@ function modeOf(items: import("./types").Item[]): PlotMode {
   const state = parsePlotYaml(blocks[0].content?.markdown || "", plotStateSchema);
   return state.mode ?? (state.active_run_id ? "pairing" : "ready");
 }
-export async function readPlotMode() { return modeOf(await readPlotItems(plotChannel())); }
+export async function readPlotMode(): Promise<PlotMode> {
+  if (process.env.NODE_ENV === "production") return "inactive";
+  return modeOf(await readPlotItems(plotChannel()));
+}
 export async function readActivePlotPrompt(): Promise<"one" | "two"> {
   const items = await readPlotItems(plotChannel());
   const block = items.find(item => item.type === "Text" && item.title === "state");
@@ -62,7 +65,7 @@ export function pinnedPrompt(items: import("./types").Item[]) {
   const block = pinned[0];
   const text = (block.content?.markdown || block.content?.plain || "").trim();
   if (!text) throw new Error("The pinned prompt text is empty.");
-  return { text, revision: `${block.id}:${block.updated_at}` };
+  return { id: block.id, text, revision: `${block.id}:${block.updated_at}` };
 }
 export const readPlotPrompt = unstable_cache(async (active: "one" | "two") => {
   const channel = active === "one" ? "plot-prompt-one" : "plot-prompt-two";

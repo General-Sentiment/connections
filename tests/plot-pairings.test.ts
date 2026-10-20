@@ -15,7 +15,7 @@ it("rejects duplicate pointers, wrong schema, and invalid IDs", () => {
 
 it("reads exactly the pinned public text block", () => {
   const base = { id: 1, type: "Text" as const, title: null, state: "available", visibility: "public", created_at: "now", updated_at: "later", content: { markdown: "Pinned question", plain: "Pinned question" }, connection: { id: 1, position: 1, pinned: true, connected_at: "now", connected_by: { id: 1, type: "User" as const, name: "A", slug: "a" } } };
-  expect(pinnedPrompt([{ ...base, id: 2, connection: { ...base.connection, pinned: false } }, base])).toEqual({ text: "Pinned question", revision: "1:later" });
+  expect(pinnedPrompt([{ ...base, id: 2, connection: { ...base.connection, pinned: false } }, base])).toEqual({ id: 1, text: "Pinned question", revision: "1:later" });
   expect(() => pinnedPrompt([])).toThrow("Pin exactly one");
   expect(() => pinnedPrompt([base, { ...base, id: 3 }])).toThrow("Pin exactly one");
   expect(() => pinnedPrompt([{ ...base, visibility: "private" }])).toThrow("Pin exactly one");

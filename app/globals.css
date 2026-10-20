@@ -400,7 +400,7 @@ body:has([aria-busy="true"]),body:has([aria-busy="true"]) *{cursor:wait!importan
 .selection-prompt p{margin:0}
 button.prompt-remix{flex-shrink:0;width:32px;height:32px;padding:3px}
 .prompt-remix svg{display:block;width:18px;height:18px}
-.picker-body>.selection-prompt{padding:20px 0;border-bottom:1px solid var(--rule);margin-bottom:20px}
+.picker-body>.selection-prompt{padding:0 0 20px;border-bottom:1px solid var(--rule);margin-bottom:20px}
 .picker-channel-nav{display:flex;align-items:center;gap:16px;margin:16px 0;font-size:14px}
 .picker-channel-nav span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
@@ -710,3 +710,13 @@ html,body{line-height:1.45;-webkit-font-smoothing:antialiased;text-rendering:opt
 .state-dropdown{position:relative;color:var(--fg)}.state-dropdown summary{display:flex;align-items:center;justify-content:space-between;gap:16px;list-style:none;border:1px solid var(--input-border);padding:10px 12px;cursor:pointer;font-size:16px;line-height:1.5;background:var(--bg)}.state-dropdown summary::-webkit-details-marker{display:none}.state-dropdown summary[aria-disabled=true]{opacity:.45;cursor:wait}.state-dropdown-options{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:20;padding:4px;border:1px solid var(--border-strong);background:var(--bg)}.state-dropdown-options button{display:flex;justify-content:space-between;width:100%;padding:10px 12px;border-radius:0;background:transparent;font-size:16px;font-weight:400;text-align:left}.state-dropdown-options button:hover,.state-dropdown-options button:focus-visible,.state-dropdown-options button[aria-pressed=true]{background:var(--surface)}
 
 .plot-active-prompt{border:0;padding:0;margin:0 0 32px;display:flex;gap:20px}.plot-active-prompt legend{font-size:14px;color:var(--muted);margin-bottom:8px}.plot-active-prompt input[type=radio]{appearance:auto;accent-color:var(--fg)}.plot-prompt{font-size:24px;line-height:1.4}
+
+.plot-prompt-container{width:100%;max-width:477px;margin:0 auto}.plot-prompt-answer .selected-description-field{margin-top:24px}.plot-prompt-answer .selected-slot{min-width:0}
+
+.plot-prompt-answer .selected-description-field + .profile-primary{margin-top:20px}
+
+.empty-answer-tile{width:100%;aspect-ratio:1;display:grid;place-items:center;border:1px solid var(--border);background:transparent}.empty-answer-tile>button{background:var(--hover);max-width:calc(100% - 32px);white-space:normal}
+
+.create-block{min-width:0}.create-block-square{position:relative;width:100%;aspect-ratio:1;background:var(--surface);border:1px solid transparent}.create-block-square:focus-within{border-color:var(--fg)}.create-block-square textarea{position:absolute;inset:0;width:100%;height:100%;padding:12px 12px 40px;border:0;border-radius:0;background:transparent;resize:none;outline:none;font-size:16px;line-height:1.4}.create-block-plus{position:absolute;inset:0;display:grid;place-items:center;font-size:36px;pointer-events:none}.create-block-hint{position:absolute;inset:0;display:flex;align-content:center;justify-content:center;flex-wrap:wrap;padding:24px;text-align:center;font-size:18px;line-height:1.4;pointer-events:none;opacity:0}.create-block-hint button.quiet{font:inherit;text-decoration:underline;pointer-events:auto;display:inline;padding:0;min-height:0;color:inherit;vertical-align:baseline}.create-block-square:hover .create-block-plus{opacity:0}.create-block-square:hover .create-block-hint{opacity:1}.create-block-shortcut{position:absolute;bottom:10px;left:10px;padding:1px 6px;border-radius:3px;background:var(--hover);color:var(--muted);font:10px/1.4 monospace;pointer-events:none;max-width:calc(100% - 20px)}.create-block-preview{position:absolute;width:100%;height:100%;object-fit:contain}.create-block-change{position:absolute;bottom:10px;left:10px;right:10px;white-space:normal;font-size:12px}.create-block-submit{width:100%;margin-top:10px}.create-block-square.is-focused .create-block-hint{display:none}
+
+.create-block-hint{display:grid;place-items:center}.create-block-hint p{margin:0}.create-block-hint button.quiet{white-space:nowrap}

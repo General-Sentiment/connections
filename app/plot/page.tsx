@@ -1,4 +1,4 @@
-import ReactMarkdown from "react-markdown";
+import { PlotPromptAnswer } from "@/components/plot-prompt-answer";
 import { readPlotMode, readActivePlotPrompt, readPlotPrompt } from "@/lib/plot-pairings";
 import { PlotModeSync } from "@/components/plot-mode-sync";
 import { PlotPairing } from "@/components/plot-pairing";
@@ -21,7 +21,7 @@ export default async function Plot() {
     const activePrompt = await readActivePlotPrompt();
     let prompt; let promptError = "";
     try { prompt = await readPlotPrompt(activePrompt); } catch (cause) { promptError = cause instanceof Error ? cause.message : "The prompt could not be loaded."; }
-    return <div className="page plot-page"><Header title="Plot" parent="Connections" hideArena /><PlotModeSync mode={mode} activePrompt={activePrompt} promptRevision={prompt?.revision} /><section className="plot-pairing plot-checkin-waiting plot-prompt">{prompt ? <ReactMarkdown skipHtml>{prompt.text}</ReactMarkdown> : <p role="alert">{promptError}</p>}</section></div>;
+    return <div className="page plot-page"><Header title="Plot" parent="Connections" hideArena /><PlotModeSync mode={mode} activePrompt={activePrompt} promptRevision={prompt?.revision} /><div className="plot-prompt-container">{prompt ? <PlotPromptAnswer key={`${session.person.id}:${prompt.id}`} userId={session.person.id} prompt={{ id: prompt.id, text: prompt.text }} /> : <p role="alert">{promptError}</p>}</div></div>;
   }
   let complete = false;
   let error = "";

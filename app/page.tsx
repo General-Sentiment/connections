@@ -64,6 +64,8 @@ export default async function Directory({ searchParams }: { searchParams: Promis
     // Sort the full directory before filtering and pagination.
     items.sort((a, b) => Date.parse(order === "updated" ? b.updated_at : b.created_at) - Date.parse(order === "updated" ? a.updated_at : a.created_at) || b.id - a.id);
   }
+  // Hide the testing account before grid filtering and pagination in production.
+  if (process.env.NODE_ENV === "production" && view === "grid") items = items.filter(item => Number(item.metadata?.profile_user_id) !== 1646078);
   locations = [...new Map(items.flatMap(item => {
     const m = item.metadata;
     if (typeof m?.location_country !== "string" || !m.location_country) return [];

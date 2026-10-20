@@ -1,4 +1,5 @@
 "use client";
+import { CreateBlockTile } from "./create-block-tile";
 import { usePickerDialog } from "./use-picker-dialog";
 import { useEffect, useRef, useState } from "react";
 import type { Item } from "@/lib/types";
@@ -7,7 +8,7 @@ import { CardFace } from "./card";
 import { SelectionPrompt } from "./selection-prompt";
 import { itemKey, pastedArenaUrl } from "@/lib/urls";
 
-export function ItemPicker({ selected, onChange, onClose, onReplace, prompt, onRemix, remixDisabled }: { selected: Item[]; onChange: (items: Item[]) => void; onClose: () => void; onReplace?: (item: Item) => void; prompt?: ProfilePrompt; onRemix?: () => void; remixDisabled?: boolean }) {
+export function ItemPicker({ selected, onChange, onClose, onReplace, prompt, onRemix, remixDisabled, plotPromptId, sandbox = false }: { plotPromptId?: number; sandbox?: boolean; selected: Item[]; onChange: (items: Item[]) => void; onClose: () => void; onReplace?: (item: Item) => void; prompt?: ProfilePrompt; onRemix?: () => void; remixDisabled?: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [type, setType] = useState<"Block" | "Channel">("Block"); const [q, setQ] = useState("");
   const [trail, setTrail] = useState<Item[]>([]); const channel = trail.at(-1);
@@ -28,12 +29,12 @@ export function ItemPicker({ selected, onChange, onClose, onReplace, prompt, onR
     return () => { clearTimeout(timer); controller.abort(); };
   }, [type, q, page, channel, retry]);
   function navigate(nextTrail: Item[]) { setBusy(true); setTrail(nextTrail); setQ(""); setPage(1); }
-  return <dialog ref={dialog} className="picker-dialog" onCancel={onClose} onClick={event => { if (event.target === dialog.current) onClose(); }} aria-label="Choose a block or channel"><div className="picker-body">
+  return <dialog ref={dialog} className="picker-dialog" onCancel={event => { event.preventDefault(); if (event.target === event.currentTarget) onClose(); }} onClick={event => { if (event.target === dialog.current) onClose(); }} aria-label="Choose a block or channel"><div className="picker-body">
     <SelectionPrompt prompt={prompt} onRemix={onRemix} onClose={onClose} disabled={remixDisabled} />
     <div className="picker-search-row"><input autoFocus className="search-input" aria-label={channel ? "Search this channel" : "Search your blocks and channels"} placeholder={channel ? "Search this channel or paste an Are.na URL" : "Search by name or paste an Are.na URL"} value={q} onChange={e => { setBusy(true); setQ(e.target.value); setPage(1); }} /><div className="picker-toggle" role="group" aria-label="Content type">{(["Block", "Channel"] as const).map(t => <button key={t} type="button" className={type === t && !channel ? "active" : undefined} aria-pressed={type === t && !channel} onClick={() => { setType(t); navigate([]); }}>{t}s</button>)}</div></div>
     {channel && <div className="picker-channel-nav"><button type="button" className="quiet" onClick={() => navigate(trail.slice(0, -1))}>← Back</button><span>{channel.title || "Untitled channel"}</span></div>}
     <p className="sr-only" role="status">{busy ? "Loading items…" : error ? "Items could not be loaded." : `${items.length} items available.`}</p>
-    <div className="picker-results" aria-busy={busy}>{busy && page === 1 ? <div className="picker-loading" role="status" aria-label="Loading"><span className="loading-spinner" aria-hidden /></div> : <>{scope && <p className="small muted" aria-live="polite">{scope}</p>}{error && <p className="error" role="alert">{error}</p>}<div className="picker-grid">{items.map(item => {
+    <div className="picker-results" aria-busy={busy}>{busy && page === 1 ? <div className="picker-loading" role="status" aria-label="Loading"><span className="loading-spinner" aria-hidden /></div> : <>{scope && <p className="small muted" aria-live="polite">{scope}</p>}{error && <p className="error" role="alert">{error}</p>}<div className="picker-grid">{type === "Block" && !channel && page === 1 && <CreateBlockTile plotPromptId={plotPromptId} sandbox={sandbox} onCreated={item => { if (onReplace) onReplace(item); else onChange([...selected, item]); }} />}{items.map(item => {
       const checked = selected.some(x => itemKey(x) === itemKey(item));
       return <button key={itemKey(item)} type="button" className={`picker-item ${checked ? "selected" : ""}`} aria-pressed={checked} aria-label={`${checked ? "Selected" : "Select"} ${item.title || "Untitled"}`} disabled={Boolean(onReplace && checked)} onClick={() => { if (onReplace) onReplace(item); else onChange(checked ? selected.filter(x => itemKey(x) !== itemKey(item)) : [...selected, item]); }}><CardFace item={item} /><span className="picker-title">{item.title || "Untitled"}</span>{checked && <span className="selection-mark">✓</span>}</button>;
     })}</div>{!items.length && !error && <p className="empty">No items found.</p>}{next && <div className="picker-load-more"><button type="button" disabled={busy} onClick={() => { setBusy(true); if (error) setRetry(value => value + 1); else setPage(next); }}>{busy ? "Loading…" : error ? "Retry" : "Load more"}</button></div>}</>}</div>
