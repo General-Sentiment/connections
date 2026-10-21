@@ -19,7 +19,6 @@ import { readProfile, availableProfileRef } from "@/lib/profiles";
 import { DirectoryAbout } from "@/components/directory-about";
 import { demoProfiles } from "@/lib/demo";
 import { isDemo, groupId, aboutBlockId } from "@/lib/config";
-import { RefreshProfile } from "@/components/refresh-profile";
 import { ArenaClient, ArenaError } from "@/lib/arena";
 import { getSession } from "@/lib/session";
 import { randomInt } from "node:crypto";
@@ -45,6 +44,11 @@ export default async function Directory({ searchParams }: { searchParams: Promis
   const view = query.view === "table" ? "table" : "grid";
   const order = query.order === "updated" || query.order === "newest" ? query.order : "random";
   const seed = /^\d{1,9}$/.test(query.seed || "") ? Number(query.seed) : randomInt(1, 1000000000);
+  if (order === "random" && !/^\d{1,9}$/.test(query.seed || "")) {
+    const seededQuery = new URLSearchParams(Object.entries(query).filter(([, value]) => typeof value === "string") as [string, string][]);
+    seededQuery.set("seed", String(seed));
+    redirect(`/?${seededQuery}`);
+  }
   const pageHref = (number: number) => `/?view=${view}&order=${order}&page=${number}${country ? `&country=${encodeURIComponent(country)}` : ""}${city ? `&city=${encodeURIComponent(city)}` : ""}${filter ? `&open_to=${filter}` : ""}${order === "random" ? `&seed=${seed}` : ""}`;
   const session = await getSession(); let existingProfile: Awaited<ReturnType<typeof availableProfileRef>>; let items: Item[] = []; let next: number | null = null; let error = "";
   if (session?.person && !demo) {
@@ -96,7 +100,7 @@ export default async function Directory({ searchParams }: { searchParams: Promis
     next = matching.length > profileLimit ? page + 1 : null;
     entries = matching.slice(0, profileLimit);
   }
-  return <div className="page directory-page homepage"><RefreshProfile /><DirectoryHeader active="profiles" hasProfile={Boolean(existingProfile)} />
+  return <div className="page directory-page homepage"><DirectoryHeader active="profiles" hasProfile={Boolean(existingProfile)} />
     <MobileDirectoryControls><div className="info-grid"><section><h2 className="info-title">View</h2><DirectoryView view={view} /></section><section><h2 className="info-title">Order</h2><DirectoryOrder order={order} seed={seed} /></section><section><h2 className="info-title">Open to</h2><DirectoryFilter value={filter || "all"} /></section><section><h2 className="info-title">Location</h2><DirectoryLocation locations={locations} country={country} city={city} /></section></div></MobileDirectoryControls>
     <DevListing view={view}>{query.error && <p className="notice error" role="alert">{query.error}</p>}{error && <p className="notice error" role="alert">{error}</p>}
     {!demo && !groupId() && <div className="notice"><p>The directory is being set up.</p><Link href="/setup">Continue setup →</Link></div>}

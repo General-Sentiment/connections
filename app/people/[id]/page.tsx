@@ -8,7 +8,6 @@ import { RecentProfileItems } from "@/components/recent-profile-items";
 import { PromptAuthor } from "@/components/prompt-author";
 import { arenaUrl } from "@/lib/urls";
 import { ArenaClient } from "@/lib/arena";
-import { RefreshProfile } from "@/components/refresh-profile";
 import { Welcome, hasConnection } from "@/components/welcome";
 import Link from "@/components/app-link";
 import { notFound } from "next/navigation";
@@ -33,7 +32,7 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
   else { try { profile = await readProfile(id, new ArenaClient(session?.token)); } catch (e) { logServerError(e, { event: "page.load_failed", route: "/people/[id]", method: "GET" }); return <div className="page"><Header title="Profile" /><p className="notice error">{e instanceof Error ? e.message : "This profile is unavailable."}</p></div>; } const results = await Promise.allSettled([recentPublic(profile.person.id, "Block"), recentPublic(profile.person.id, "Channel")]); if (results[0].status === "fulfilled") blocks = results[0].value; if (results[1].status === "fulfilled") channels = results[1].value; if (results.some(r => r.status === "rejected")) recentError = "Recent items could not be loaded from Are.na. Try again shortly."; }
   const formatDate = (value: string) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }); };
   const photo = safeUrl(profile.photo?.image?.medium?.src || profile.photo?.image?.src);
-  return <div className="page"><RefreshProfile /><Header arenaHref={arenaUrl(profile.channel)} title={profile.person.name} titleHref={`https://www.are.na/${profile.person.slug}`} actions={<>{session?.person?.id === profile.person.id ? <Link className="button" href="/profile/edit">Edit profile</Link> : <Link className="button" href={`/connections/new?person=${profile.person.id}&profile=${profile.channel.id}`}>Connect →</Link>}</>} />
+  return <div className="page"><Header arenaHref={arenaUrl(profile.channel)} title={profile.person.name} titleHref={`https://www.are.na/${profile.person.slug}`} actions={<>{session?.person?.id === profile.person.id ? <Link className="button" href="/profile/edit">Edit profile</Link> : <Link className="button" href={`/connections/new?person=${profile.person.id}&profile=${profile.channel.id}`}>Connect →</Link>}</>} />
     {session?.person?.id === profile.person.id && <ProfileVisibility channelId={profile.channel.id} hidden={profile.channel.metadata?.hidden === true} banner />}
     <div className="profile-introduction">
       {photo && <div className="profile-content-photo"><img src={photo} alt={profile.person.name} /></div>}

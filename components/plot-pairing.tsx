@@ -64,8 +64,8 @@ export function PlotPairing({ mode }: { mode: "ready" | "pairing" }) {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Check-in failed."); }
     finally { setCheckingIn(false); }
   }
-  return <section className={`plot-pairing${pairing && !pairing.partners.length ? " plot-checkin-waiting" : ""}`} aria-live="polite">{(!pairing || pairing.runId !== null) && <h2>{pairing?.partners.length ? "Your Plot pairing" : "You’re ready for Connections at Plot"}</h2>}
-    {!pairing && !error && <p role="status">Checking for your pairing…</p>}
+  return <section className={`plot-pairing${!pairing || !pairing.partners.length ? " plot-checkin-waiting" : ""}`} aria-live="polite">{pairing && pairing.runId !== null && <h2>{pairing.partners.length ? "Your Plot pairing" : "You’re ready for Connections at Plot"}</h2>}
+    {!pairing && !error && <div role="status" aria-label="Loading your pairing"><span className="loading-spinner plot-loading-spinner" aria-hidden="true" /></div>}
     {pairing && (mode === "ready" || pairing.runId === null) && !pairing.partners.length && <button type="button" disabled={checkingIn || pairing.checkedIn} onClick={() => void checkIn()}>{checkingIn ? "Checking in…" : pairing.checkedIn ? "You’re checked in" : "I’m here"}</button>}
     {mode === "pairing" && pairing?.runId != null && !pairing.partners.length && <p>You aren’t included in the current round. Your pairing will appear here when you’re included in a new round.</p>}
     {pairing?.partners.map(partner => <div className="plot-pairing-person" key={partner.user_id}><PersonProfileCard id={partner.profile_id} name={partner.name} photo={partner.photo} /><div className="plot-connection-points"><h3>You connect on</h3>{partner.shared.length ? <ul>{intentions.filter(([value]) => partner.shared.includes(value)).map(([value, label]) => <li key={value}>{label}</li>)}</ul> : <p className="small muted">A chance to meet someone new.</p>}</div>{partner.note && <p className="small muted">{partner.note}</p>}
