@@ -26,8 +26,9 @@ export function LocationPicker({ value, onChange }: { value: Location; onChange:
     return () => { clearTimeout(timer); controller.abort(); };
   }, [query, searching]);
   return <div className="location-picker" aria-busy={busy}>
-    <label className="field" htmlFor={id}>City<input ref={input} id={id} autoComplete="off" required maxLength={100} value={query} onChange={e => { setQuery(e.target.value); setOptions([]); setSearching(true); onChange({ city: e.target.value, country: value.country }); }} onKeyDown={e => { if (e.key === "Escape") { setSearching(false); setOptions([]); } }} aria-describedby={`${id}-help ${id}-results`} aria-controls={searching && options.length ? `${id}-suggestions` : undefined} /></label>
+    <div className="city-search-anchor"><label className="field" htmlFor={id}>City<input ref={input} id={id} autoComplete="off" required maxLength={100} value={query} onChange={e => { setQuery(e.target.value); setOptions([]); setSearching(true); onChange({ city: e.target.value, country: value.country }); }} onKeyDown={e => { if (e.key === "Escape") { setSearching(false); setOptions([]); } }} aria-describedby={`${id}-help ${id}-results`} aria-controls={searching && options.length ? `${id}-suggestions` : undefined} /></label>
     {searching && options.length > 0 && <ul id={`${id}-suggestions`} className="location-suggestions" aria-label="City suggestions">{options.map(option => <li key={option.id}><button type="button" onClick={() => { onChange(option); setQuery(option.city); setSearching(false); setOptions([]); input.current?.focus(); }}>{[option.city, option.region, option.country].filter(Boolean).join(", ")}</button></li>)}</ul>}
+    </div>
     <p id={`${id}-results`} className="sr-only" role="status">{busy ? "Searching cities…" : searching && options.length ? `${options.length} city suggestions available. Tab to choose a city.` : ""}</p>
     <p id={`${id}-help`} className="small muted">{value.id ? [value.region, value.country].filter(Boolean).join(", ") : "Choose a suggested city so people can find you by location."}</p>
     {error && <p role="status" className="small muted">{error} You can keep your typed location.</p>}

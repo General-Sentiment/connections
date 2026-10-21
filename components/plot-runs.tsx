@@ -1,8 +1,11 @@
 "use client";
 import { broadcastPlotUpdate, subscribePlotUpdates } from "@/lib/plot-broadcast";
+import Link from "./app-link";
+import { intentions } from "@/lib/details";
+import { safeUrl } from "@/lib/urls";
 import { StateSelect } from "./state-select";
 import { useEffect, useRef, useState } from "react";
-type Runs = { activePrompt: "one" | "two"; mode: "inactive" | "ready" | "pairing" | "prompt"; attendees: { userId: number; profileId: number; name: string }[]; checkedInCount: number; activeRunId: number | null; runs: { id: number; title: string | null; createdAt: string; pairCount: number }[] };
+type Runs = { activeSettings?: { romantic: boolean; romanticPreferences: boolean; location?: string }; activePairs: { first: { user_id: number; profile_id: number; name: string; photo?: string | null; chair?: number }; second: { user_id: number; profile_id: number; name: string; photo?: string | null; chair?: number }; shared: string[]; note?: string }[]; activePrompt: "one" | "two"; mode: "inactive" | "ready" | "pairing" | "prompt"; attendees: { userId: number; profileId: number; name: string }[]; checkedInCount: number; activeRunId: number | null; runs: { id: number; title: string | null; createdAt: string; pairCount: number }[] };
 export function PlotRuns() {
   const [data, setData] = useState<Runs>();
   const [error, setError] = useState("");
@@ -15,7 +18,7 @@ export function PlotRuns() {
         const response = await fetch("/api/plot/runs", { cache: "no-store", signal: controller.signal });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Saved rounds could not be loaded.");
-        if (!controller.signal.aborted) { setData(result); setError(""); }
+        if (!controller.signal.aborted) { setData({ ...result, activePairs: result.activePairs ?? [] }); setError(""); }
       } catch (cause) { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Saved rounds could not be loaded."); }
     }
     void load();
@@ -79,11 +82,11 @@ export function PlotRuns() {
     {!data && !error && <p role="status" className="small muted">Loading saved rounds…</p>}
     {error && <p role="alert" className="notice error">{error}</p>}
     {data && !data.runs.length && <p className="small muted">No saved rounds yet. Pair to create and activate the first round.</p>}
-    {data && <details className="plot-attendees"><summary>{data.checkedInCount} {data.checkedInCount === 1 ? "person checked in" : "people checked in"}</summary>{data.attendees.length ? <p className="plot-attendee-names">{data.attendees.map((person, index) => <span key={person.userId}>{index > 0 && ", "}<a href={`/people/${person.profileId}`}>{person.name}</a></span>)}</p> : <p className="small muted">No one has checked in yet.</p>}</details>}
     <div className="plot-run-grid">{data?.runs.map((run, index) => <article className="plot-run-card" key={run.id}>
       <button type="button" className="plot-run-block" aria-pressed={data.activeRunId === run.id} disabled={saving !== undefined} onClick={() => void select(run.id)}><span>Round {data.runs.length - index}</span><span className="small muted">{new Date(run.createdAt).toLocaleString()}</span><span className="small muted">{run.pairCount} {run.pairCount === 1 ? "pair" : "pairs"} · #{run.id}</span><span>{saving === run.id ? "Saving…" : data.activeRunId === run.id ? "Active" : "Select round"}</span></button>
       <div className="plot-run-actions"><a href={`https://www.are.na/block/${run.id}`} target="_blank" rel="noopener noreferrer">Open on Are.na ↗</a><button type="button" className="quiet" disabled={saving !== undefined} onClick={() => void remove(run.id)}>Delete round</button></div>
     </article>)}</div>
+    {Boolean(data?.activePairs?.length) && <section aria-label="Active round pairings"><h3>Active round pairings</h3><div className="pairing-table-scroll"><table className="pairing-table"><thead><tr><th>Person 1</th><th>Person 2</th><th>Paired based on</th></tr></thead><tbody>{(data?.activePairs ?? []).map((pair, index) => <tr key={index}>{[pair.first, pair.second].map((person, column) => <td key={column}><Link className="pairing-person" href={`/people/${person.profile_id}`}>{safeUrl(person.photo) ? <img src={safeUrl(person.photo)} alt="" loading="lazy" /> : <span className="pairing-avatar-placeholder" aria-hidden>{person.name.split(/\s+/).slice(0, 2).map(word => word[0]).join("")}</span>}<span>{person.name}<span className="small muted"> · {person.chair ? `Chair ${person.chair}` : "No chair"}</span></span></Link></td>)}<td>{pair.shared?.length ? intentions.filter(([value]) => pair.shared.includes(value)).map(([, label]) => label).join(", ") : "Random — no shared preferences"}{!pair.note && data?.activeSettings?.romantic && <div className="small muted">{data.activeSettings.romanticPreferences ? "Mutual romantic preferences" : "Open to romance"}</div>}{!pair.note && data?.activeSettings?.location && <div className="small muted">Same {data.activeSettings.location === "state" ? "state / region" : data.activeSettings.location}</div>}{pair.note && <div className="small muted">{pair.note}</div>}</td></tr>)}</tbody></table></div></section>}
     {data && data.runs.length > 0 && <p className="small muted">Selecting a round changes the pairing shown on attendees’ Plot pages.</p>}
   </section>;
 }

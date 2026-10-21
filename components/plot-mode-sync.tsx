@@ -18,7 +18,7 @@ export function PlotModeSync({ mode, activePrompt, promptRevision, activeRunId, 
       try {
         const response = await fetch(`/api/plot/pairings?modeOnly=true${fresh ? "&refresh=true" : ""}`, { cache: "no-store", signal: controller.signal });
         if (response.status === 429) delay = Math.max(delay, (Number(response.headers.get("Retry-After")) || 60) * 1000);
-        if (response.ok) { const data = await response.json(); if (!stopped && (data.mode !== mode || (answersRevision !== undefined && data.answersRevision !== answersRevision) || (activeRunId !== undefined && data.activeRunId !== activeRunId) || (mode === "prompt" && (data.activePrompt !== activePrompt || data.promptRevision !== promptRevision)))) { router.refresh(); } }
+        if (response.ok) { const data = await response.json(); if (!stopped && (data.mode !== mode || (answersRevision !== undefined && data.answersRevision !== answersRevision) || (activeRunId !== undefined && data.activeRunId !== activeRunId) || (activePrompt !== undefined && (data.activePrompt !== activePrompt || data.promptRevision !== promptRevision)))) { router.refresh(); } }
       } catch { /* Retry without disrupting onboarding. */ }
       finally { inFlight = false; }
       if (!stopped && pendingFocus) { pendingFocus = false; void poll(true); }

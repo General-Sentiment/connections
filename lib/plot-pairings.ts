@@ -1,3 +1,4 @@
+import { assignPlotChairs } from "./plot-chairs";
 import { z } from "zod";
 import { parseDocument, stringify } from "yaml";
 import { unstable_cache } from "next/cache";
@@ -12,7 +13,7 @@ import { safeUrl } from "./urls";
 import { withLock } from "./coordination";
 
 export const plotChannel = () => process.env.ARENA_PLOT_CHANNEL || "plot-kijbdhlt3gy";
-const member = z.object({ user_id: z.number().int().positive(), profile_id: z.number().int().positive(), name: z.string().max(300), photo: z.string().url().nullable().optional() }).strict();
+const member = z.object({ user_id: z.number().int().positive(), profile_id: z.number().int().positive(), name: z.string().max(300), chair: z.number().int().min(1).max(20).optional(), photo: z.string().url().nullable().optional() }).strict();
 export const plotRunSchema = z.object({
   schema: z.literal("plot_pairings"), version: z.literal(1), created_at: z.string(), created_by: z.number().int().positive(),
   settings: z.object({ checkedInOnly: z.boolean().optional(), location: z.enum(["city", "state", "country"]).optional(), romantic: z.boolean(), romanticPreferences: z.boolean() }),
@@ -76,6 +77,10 @@ export function plotPromptResponses(items: import("./types").Item[]) {
   const answers = items.filter(item => item.id !== prompt.id && !item.connection?.pinned && item.visibility !== "private" && item.state === "available").map(item => ({ item, author: item.connection?.connected_by?.name || item.user?.name || "" }));
   return { answers, revision: answers.map(answer => `${answer.item.type}:${answer.item.id}:${answer.item.updated_at}:${answer.item.connection?.id || ""}`).join("|") };
 }
+export function plotPromptRespondents(items: import("./types").Item[]) {
+  const { answers } = plotPromptResponses(items);
+  return new Set(answers.map(({ item }) => Number(item.connection?.connected_by?.id)).filter(id => Number.isSafeInteger(id) && id > 0));
+}
 export async function readPlotPromptResponses(active: "one" | "two") { return plotPromptResponses(await readPlotPromptItems(active)); }
 export async function setPlotPrompt(token: string, activePrompt: "one" | "two") {
   const channel = await plotPublisher(token);
@@ -126,6 +131,18 @@ export async function checkInToPlot(token: string, userId: number) {
     return { checkedIn: true };
   });
 }
+export async function checkOutOfPlot(token: string, userId: number) {
+  return withLock(`plot-checkin:${plotAttendeesChannel()}:${userId}`, async () => {
+    const manager = await directoryClient(token);
+    const items = await allItems(manager, `/channels/${encodeURIComponent(plotAttendeesChannel())}/contents?type=Channel`);
+    const ownProfiles = items.filter(item => item.type === "Channel" && item.metadata?.app === "connections" && Number(item.metadata.profile_user_id) === userId);
+    for (const profile of ownProfiles) {
+      if (!profile.connection?.id) throw new ArenaError(502, "Your check-in could not be removed. Try again.");
+      await manager.disconnect(profile.connection.id);
+    }
+    return { checkedIn: false };
+  });
+}
 // One shared public read per revalidation window, rather than one scan per attendee.
 export const readPlotRound = unstable_cache(async (channel: string) => {
   const items = await readPlotItems(channel);
@@ -151,16 +168,19 @@ export async function publishPlotRound(token: string, userId: number, rawInput: 
     if (states.length > 1) throw new Error("The Plot channel must have exactly one state block.");
     if (states[0]) parsePlotYaml(states[0].content?.markdown || "", plotStateSchema);
     const previous = items.filter(item => item.type === "Text" && item.metadata?.role === "plot_pairings");
-    const seen = new Set(previous.flatMap(item => parsePlotYaml(item.content?.markdown || "", plotRunSchema).pairs.map(pair => matchKey(pair.first.user_id, pair.second.user_id))));
-    const loaded: { profiles: import("./types").Profile[]; skipped: number } = await loadMatchProfiles(groupId()!, undefined, token, input.checkedInOnly ? plotAttendeesChannel() : undefined);
-    const attendees = input.checkedInOnly ? checkedInUsers(await allItems(manager, `/channels/${encodeURIComponent(plotAttendeesChannel())}/contents?type=Channel`)) : new Set<number>();
-    const profiles = input.checkedInOnly ? loaded.profiles.filter(profile => attendees.has(profile.person.id)) : loaded.profiles;
+    const history = previous.map(item => parsePlotYaml(item.content?.markdown || "", plotRunSchema));
+    const seen = new Set(history.flatMap(run => run.pairs.map(pair => matchKey(pair.first.user_id, pair.second.user_id))));
+    const active = promptOf(items);
+    const promptItems = await allItems(manager, `/channels/plot-prompt-${active === "one" ? "one" : "two"}/contents`);
+    const answered = plotPromptRespondents(promptItems);
+    const loaded: { profiles: import("./types").Profile[]; skipped: number } = await loadMatchProfiles(groupId()!, undefined, token);
+    const profiles = loaded.profiles.filter(profile => answered.has(profile.person.id));
     const skipped = loaded.skipped;
-    if (profiles.length < 2) throw new Error(input.checkedInOnly ? "At least two people with readable profiles must check in before publishing a round." : "At least two readable profiles are needed to publish a round.");
+    if (profiles.length < 2) throw new Error("At least two people with readable profiles must answer the active prompt before publishing a round.");
     const result = pairEveryone(profiles, input.location, { ...input, seen });
     const ref = (profile: typeof profiles[number]) => ({ user_id: profile.person.id, profile_id: profile.channel.id, name: profile.person.name, photo: safeUrl(profile.photo?.image?.medium?.src || profile.photo?.image?.src || profile.person.avatar) || null });
-    const run = plotRunSchema.parse({ schema: "plot_pairings", version: 1, created_at: new Date().toISOString(), created_by: userId, settings: input,
-      unavailable_profiles: skipped, pairs: result.pairs.map(pair => ({ first: ref(pair.first), second: ref(pair.second), shared: pair.shared, ...(pair.fallback ? { note: pair.fallback } : {}) })), unpaired: result.unpaired.map(ref) });
+    const run = plotRunSchema.parse({ schema: "plot_pairings", version: 1, created_at: new Date().toISOString(), created_by: userId, settings: { ...input, checkedInOnly: false },
+      unavailable_profiles: skipped, pairs: assignPlotChairs(result.pairs.map(pair => ({ first: ref(pair.first), second: ref(pair.second), shared: pair.shared, ...(pair.fallback ? { note: pair.fallback } : {}) })), history), unpaired: result.unpaired.map(ref) });
     const block = await manager.createBlock(channel.id, `Pairings · ${run.created_at}`, plotYaml(run), "plot_pairings");
     // Publish the pointer last: readers never see a partially written run.
     const state = plotYaml({ schema: "plot_state", version: 1, active_prompt: promptOf(items), mode: modeOf(items), active_run_id: block.id, updated_at: new Date().toISOString() });
@@ -180,10 +200,10 @@ export async function listPlotRuns(token: string) {
     const run = parsePlotYaml(item.content?.markdown || "", plotRunSchema);
     return { id: item.id, title: item.title, createdAt: run.created_at, pairCount: run.pairs.length };
   }).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id - a.id);
-  const attendeeItems = await readAttendees(plotAttendeesChannel());
-  const ids = checkedInUsers(attendeeItems);
-  const attendees = [...new Map(attendeeItems.filter(item => ids.has(Number(item.metadata?.profile_user_id)) && item.type === "Channel" && item.visibility !== "private" && item.metadata?.published === true && item.metadata?.hidden !== true).map(item => [Number(item.metadata!.profile_user_id), { userId: Number(item.metadata!.profile_user_id), profileId: item.id, name: String(item.metadata?.profile_name || item.title || "Profile") }])).values()].sort((a, b) => a.name.localeCompare(b.name));
-  return { activePrompt: promptOf(items), mode: modeOf(items), activeRunId, runs, checkedInCount: attendees.length, attendees };
+  const activeBlock = items.find(item => item.id === activeRunId);
+  const activeRound = activeBlock ? parsePlotYaml(activeBlock.content?.markdown || "", plotRunSchema) : null;
+  const activePairs = activeRound?.pairs ?? [];
+  return { activePairs, activeSettings: activeRound?.settings, activePrompt: promptOf(items), mode: modeOf(items), activeRunId, runs };
 }
 export async function selectPlotRun(token: string, runId: number) {
   const channel = await plotPublisher(token);

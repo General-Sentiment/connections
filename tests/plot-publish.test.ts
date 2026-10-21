@@ -1,16 +1,20 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ item: vi.fn(), allItems: vi.fn(), createBlock: vi.fn(), updateBlock: vi.fn(), load: vi.fn(), manager: vi.fn(), profileRef: vi.fn() }));
+const mocks = vi.hoisted(() => ({ promptItems: vi.fn(), item: vi.fn(), allItems: vi.fn(), createBlock: vi.fn(), updateBlock: vi.fn(), load: vi.fn(), manager: vi.fn(), profileRef: vi.fn() }));
 vi.mock("next/cache", () => ({ unstable_cache: (fn: unknown) => fn }));
 vi.mock("../lib/arena", async () => { const original = await vi.importActual<typeof import("../lib/arena")>("../lib/arena"); return { ...original, ArenaClient: class { item = mocks.item; } }; });
-vi.mock("../lib/arena-discovery", () => ({ allItems: mocks.allItems }));
+vi.mock("../lib/arena-discovery", () => ({ allItems: (...args: unknown[]) => String(args[1]).includes("/plot-prompt-") ? mocks.promptItems(...args) : mocks.allItems(...args) }));
 vi.mock("../lib/directory-auth", () => ({ directoryClient: mocks.manager }));
 vi.mock("../lib/profiles", () => ({ availableProfileRef: mocks.profileRef, readProfile: vi.fn() }));
 vi.mock("../lib/config", () => ({ groupId: () => 1 }));
 vi.mock("../lib/match-profiles", () => ({ loadMatchProfiles: mocks.load }));
-import { publishPlotRound, selectPlotRun, deletePlotRun, checkInToPlot, setPlotMode, plotYaml } from "../lib/plot-pairings";
+import { publishPlotRound, selectPlotRun, deletePlotRun, checkInToPlot, checkOutOfPlot, setPlotMode, plotYaml } from "../lib/plot-pairings";
 import { demoProfiles } from "../lib/demo";
 beforeEach(async () => {
   vi.clearAllMocks();
+  mocks.promptItems.mockResolvedValue([
+    { id: 900, type: "Text", state: "available", visibility: "public", connection: { pinned: true }, content: { markdown: "Question?" } },
+    ...demoProfiles.slice(0, 2).map((profile, index) => ({ id: 901 + index, type: "Text", state: "available", visibility: "public", connection: { connected_by: { id: profile.person.id } } })),
+  ]);
   mocks.profileRef.mockResolvedValue({ published: 1, channel_id: 321 });
   mocks.item.mockResolvedValue({ id: 100, visibility: "closed", can: { update: true } });
   mocks.manager.mockResolvedValue({ createBlock: mocks.createBlock, updateBlock: mocks.updateBlock });
@@ -76,11 +80,6 @@ it("removes only the selected run connection from the event channel", async () =
   expect(disconnect).toHaveBeenCalledWith(99);
 });
 
-it("does not publish until two people have checked in", async () => {
-  mocks.allItems.mockResolvedValue([]);
-  await expect(publishPlotRound("token", 1, { romantic: false, romanticPreferences: true })).rejects.toThrow("check in");
-  expect(mocks.createBlock).not.toHaveBeenCalled();
-});
 
 it("check-in connects the signed-in person's profile channel and avoids duplicates", async () => {
   const connect = vi.fn();
@@ -94,12 +93,19 @@ it("check-in connects the signed-in person's profile channel and avoids duplicat
   expect(connect).not.toHaveBeenCalled();
 });
 
-it("can publish for the whole directory when check-in restriction is disabled", async () => {
+it("pairs prompt respondents even when nobody is checked in", async () => {
   mocks.allItems.mockResolvedValue([]);
   mocks.createBlock.mockResolvedValue({ id: 123 });
-  const result = await publishPlotRound("token", 1, { romantic: false, romanticPreferences: true, checkedInOnly: false });
+  const result = await publishPlotRound("token", 1, { romantic: false, romanticPreferences: true });
   expect(result.pairs).toHaveLength(1);
-  expect(mocks.createBlock.mock.calls[0][2]).toContain("checkedInOnly: false");
+  expect(mocks.load).toHaveBeenCalledWith(1, undefined, "token");
+});
+
+it("excludes people who have not answered the active prompt", async () => {
+  const promptItems = await mocks.promptItems();
+  mocks.promptItems.mockResolvedValue(promptItems.slice(0, 2));
+  await expect(publishPlotRound("token", 1, { romantic: false, romanticPreferences: true })).rejects.toThrow("answer the active prompt");
+  expect(mocks.createBlock).not.toHaveBeenCalled();
 });
 
 it("changes event mode without changing the selected round", async () => {
@@ -107,4 +113,18 @@ it("changes event mode without changing the selected round", async () => {
   const content = mocks.updateBlock.mock.calls[0][1].content;
   expect(content).toContain("mode: prompt");
   expect(content).toContain("active_run_id: 4");
+});
+
+it("check-out removes only the signed-in person's attendee connections", async () => {
+  const disconnect = vi.fn();
+  mocks.manager.mockResolvedValue({ disconnect });
+  mocks.allItems.mockResolvedValue([
+    { type: "Channel", metadata: { app: "connections", profile_user_id: 123 }, connection: { id: 71 } },
+    { type: "Channel", metadata: { app: "connections", profile_user_id: 456 }, connection: { id: 72 } },
+  ]);
+  await expect(checkOutOfPlot("token", 123)).resolves.toEqual({ checkedIn: false });
+  expect(disconnect).toHaveBeenCalledExactlyOnceWith(71);
+  mocks.allItems.mockResolvedValue([]);
+  await expect(checkOutOfPlot("token", 123)).resolves.toEqual({ checkedIn: false });
+  expect(disconnect).toHaveBeenCalledTimes(1);
 });

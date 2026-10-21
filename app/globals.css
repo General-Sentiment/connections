@@ -147,6 +147,7 @@
 .picker-loading{min-height:100%;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-size:13px}
 .loading-spinner{width:14px;height:14px;border:1px solid var(--input-border);border-top-color:var(--fg);border-radius:50%;animation:picker-spin .8s linear infinite}
 .plot-loading-spinner{display:block;width:24px;height:24px;border-width:2px}
+.plot-ready-instructions ol{max-width:850px;text-align:left;font-size:clamp(22px,3vw,36px);line-height:1.5;padding-left:1.5em;margin:0}.plot-ready-instructions li+li{margin-top:24px}
 @keyframes picker-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.loading-spinner{animation:none}}
 
@@ -427,6 +428,8 @@ button.profile-primary:hover,a.button.profile-primary:hover{background:var(--fg)
 .profile-editor .profile-form-grid textarea{display:block}
 .profile-editor .profile-form-grid .preview-text{margin:0}
 .profile-editor .location-picker>p:last-child{margin-bottom:0}
+.city-search-anchor{position:relative}
+.city-search-anchor .location-suggestions{position:absolute;top:100%;left:0;right:0;z-index:20;max-height:240px;overflow-y:auto;background:var(--bg)}
 
 .profile-wizard [hidden]{display:none!important}
 .profile-wizard .profile-form-grid,.profile-wizard .profile-preferences,.profile-wizard .profile-fields,.profile-wizard .content-section,.profile-wizard .grid{display:contents}
@@ -536,6 +539,9 @@ button.profile-primary:hover,a.button.profile-primary:hover{background:var(--fg)
 
 .profile-editor .photo-drop{aspect-ratio:1;min-height:0;position:relative}
 .profile-editor .photo-drop img{position:absolute;inset:24px;width:calc(100% - 48px);height:calc(100% - 48px);object-fit:contain}
+.profile-editor .photo-drop{align-items:center;justify-content:center;background:var(--surface)}
+.profile-editor .photo-drop .photo-file-input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.profile-editor .photo-drop:focus-within{outline:2px solid var(--fg);outline-offset:3px}
 
 .profile-wizard .form-submit{margin-top:45px}
 

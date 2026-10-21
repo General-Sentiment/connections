@@ -1,4 +1,5 @@
 "use client";
+import { publishPlotProgress } from "@/lib/plot-progress";
 import { broadcastPlotUpdate } from "@/lib/plot-broadcast";
 
 import { useEffect, useRef, useState } from "react";
@@ -17,7 +18,6 @@ export function MatchPicker({ selfId, everyone = false, publishPlot = false }: {
     window.addEventListener("plot-round-selected", clear);
     return () => window.removeEventListener("plot-round-selected", clear);
   }, [publishPlot]);
-  const [checkedInOnly, setCheckedInOnly] = useState(true);
   const [romanticPreferences, setRomanticPreferences] = useState(true);
   const [romantic, setRomantic] = useState(false);
   const [onlyMe, setOnlyMe] = useState(false);
@@ -34,6 +34,13 @@ export function MatchPicker({ selfId, everyone = false, publishPlot = false }: {
     const timer = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
     return () => clearInterval(timer);
   }, [loading]);
+  useEffect(() => {
+    if (!publishPlot || !loading) return;
+    const report = () => publishPlotProgress(progress || "Loading profiles and preferences…");
+    report();
+    const timer = setInterval(report, 5000);
+    return () => { clearInterval(timer); publishPlotProgress(null); };
+  }, [publishPlot, loading, progress]);
   const counts = progress.match(/(\d+) of (\d+) profiles/);
   const [error, setError] = useState("");
   const [skipped, setSkipped] = useState(0);
@@ -49,7 +56,7 @@ export function MatchPicker({ selfId, everyone = false, publishPlot = false }: {
     try {
       const load = async () => {
         if (profilesRef.current && !publishPlot) { setProgress("Finding a pair…"); return profilesRef.current; }
-        const result = await fetchMatchProfiles(setProgress, publishPlot && checkedInOnly);
+        const result = await fetchMatchProfiles(setProgress);
         profilesRef.current = result.profiles;
         setSkipped(result.skipped);
         return result.profiles as Profile[];
@@ -73,7 +80,7 @@ export function MatchPicker({ selfId, everyone = false, publishPlot = false }: {
         let result: ReturnType<typeof pairEveryone>;
         if (publishPlot) {
           setProgress("Saving the round and revealing pairings on Plot…");
-          const response = await fetch("/api/plot/pairings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(requireLocation ? { location: level } : {}), romantic, romanticPreferences, checkedInOnly }) });
+          const response = await fetch("/api/plot/pairings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(requireLocation ? { location: level } : {}), romantic, romanticPreferences }) });
           const data = await response.json();
           if (!response.ok) throw new Error(data.error || "The Plot round could not be published.");
           result = { pairs: data.pairs, unpaired: data.unpaired };
@@ -106,9 +113,9 @@ export function MatchPicker({ selfId, everyone = false, publishPlot = false }: {
   }
   return <>
     <p className="muted pair-introduction">{everyone ? "Include everyone, prioritizing shared “Open to” preferences. Fallback introductions are labeled; with an odd count, one person participates twice." : "Pair two people with the most shared “Open to” preferences."} Equally strong pairs are picked at random. {everyone ? "Previous pairs are avoided when possible." : "Pairs won’t repeat during this session."}</p>
-    {publishPlot && <p className="small muted">Pair saves and reveals a round on Plot. Choose whether to include only checked-in people or everyone with a published, visible profile.</p>}
+    {publishPlot && <p className="small muted">Pair saves and reveals a round on Plot. Only people who answered the active prompt are included.</p>}
     <form className="match-controls" onSubmit={event => { event.preventDefault(); findMatch(); }}>
-      {publishPlot && <label className="check"><input type="checkbox" disabled={loading} checked={checkedInOnly} onChange={event => { setCheckedInOnly(event.target.checked); setBatch(undefined); setError(""); }} />Limit to checked-in people</label>}
+
       {!everyone && <label className="check"><input type="checkbox" disabled={loading || selfId === undefined} checked={onlyMe} onChange={event => { setOnlyMe(event.target.checked); setMatch(undefined); setError(""); }} />Only pair me</label>}
       <label className="check"><input type="checkbox" disabled={loading} checked={romantic} onChange={event => { setRomantic(event.target.checked); setMatch(undefined); setError(""); }} />Pair for romance</label>
       {romantic && <div className="pair-romance-options"><label className="check"><input type="checkbox" disabled={loading} checked={romanticPreferences} onChange={event => { setRomanticPreferences(event.target.checked); setMatch(undefined); setError(""); }} />Pair based on romantic preferences</label><p className="small muted">{romanticPreferences ? "Requires gender and sexuality details and mutual compatibility with both people’s Interested in selections." : "Pairs people who are open to romance, without filtering by gender, sexuality, or Interested in selections."}</p></div>}
@@ -122,7 +129,7 @@ export function MatchPicker({ selfId, everyone = false, publishPlot = false }: {
       {error && <p role="alert" className="notice error">{error}</p>}
       {!loading && skipped > 0 && <p className="small muted">{skipped} unavailable or private {skipped === 1 ? "profile was" : "profiles were"} left out. Readable profiles with missing preferences can receive general introductions.</p>}
       {!loading && match === null && <p className="empty">No eligible pairs found. Try a broader location or turn off the location requirement.</p>}
-      {!loading && batch && <PairingTable pairs={batch.pairs} unpaired={batch.unpaired} location={requireLocation ? level === "state" ? "state / region" : level : undefined} romanticPreferences={romantic && romanticPreferences} />}
+      {!publishPlot && !loading && batch && <PairingTable pairs={batch.pairs} unpaired={batch.unpaired} location={requireLocation ? level === "state" ? "state / region" : level : undefined} romanticPreferences={romantic && romanticPreferences} />}
       {!loading && match && <section aria-label="Selected pair"><h2>{match.shared.length} shared {match.shared.length === 1 ? "preference" : "preferences"}</h2><p>{match.shared.length ? intentions.filter(([value]) => match.shared.includes(value)).map(([, label]) => label).join(" · ") : "No shared preferences yet — this pair was chosen at random."}</p>{Boolean(match.sharedSexualities?.length) && <p className="small muted">Shared sexuality: {match.sharedSexualities!.join(", ")}</p>}<div className="match-pair">{[match.first, match.second].map(profile => <div key={profile.person.id}><ProfileCard item={profile.channel} profile={profile} /><p className="small muted">{[profile.details.location.city, profile.details.location.region, profile.details.location.country].filter(Boolean).join(", ")}</p></div>)}</div></section>}
     </div>
   </>;

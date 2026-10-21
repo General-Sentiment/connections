@@ -17,12 +17,6 @@ export default async function Plot() {
   if (mode === "inactive") redirect("/onboarding");
   const session = await getSession();
   if (!session?.person || !session.token) redirect("/api/auth/login?next=/plot");
-  if (mode === "prompt") {
-    const activePrompt = await readActivePlotPrompt();
-    let prompt; let promptError = "";
-    try { prompt = await readPlotPrompt(activePrompt); } catch (cause) { promptError = cause instanceof Error ? cause.message : "The prompt could not be loaded."; }
-    return <div className="page plot-page"><Header title="Plot" parent="Connections" hideArena /><PlotModeSync mode={mode} activePrompt={activePrompt} promptRevision={prompt?.revision} /><div className="plot-prompt-container">{prompt ? <PlotPromptAnswer key={`${session.person.id}:${prompt.id}`} userId={session.person.id} prompt={{ id: prompt.id, text: prompt.text }} /> : <p role="alert">{promptError}</p>}</div></div>;
-  }
   let complete = false;
   let error = "";
   if (session?.person && session.token) {
@@ -34,11 +28,15 @@ export default async function Plot() {
       error = "We couldn’t check your profile. Please refresh to try again.";
     }
   }
+  if (!error && !complete) return <div className="page plot-page"><Header title="Plot" parent="Connections" hideArena /><PlotModeSync mode={mode} /><ProfileForm person={session.person} demo={false} plot /></div>;
+  if (!error && mode === "prompt") {
+    const activePrompt = await readActivePlotPrompt();
+    let prompt; let promptError = "";
+    try { prompt = await readPlotPrompt(activePrompt); } catch (cause) { promptError = cause instanceof Error ? cause.message : "The prompt could not be loaded."; }
+    return <div className="page plot-page"><Header title="Plot" parent="Connections" hideArena /><PlotModeSync mode={mode} activePrompt={activePrompt} promptRevision={prompt?.revision} /><div className="plot-prompt-container">{prompt ? <PlotPromptAnswer key={`${session.person.id}:${prompt.id}`} userId={session.person.id} prompt={{ id: prompt.id, text: prompt.text }} /> : <p role="alert">{promptError}</p>}</div></div>;
+  }
   return <div className="page plot-page">
     <Header title="Plot" parent="Connections" hideArena />
-    {!complete && mode === "ready" && <PlotModeSync mode={mode} />}
-    {error ? <p className="notice error" role="alert">{error}</p> : complete || mode === "pairing" ? <PlotPairing key={mode} mode={mode} /> : <>
-      <ProfileForm person={session.person} demo={false} plot />
-    </>}
+    {error ? <p className="notice error" role="alert">{error}</p> : <PlotPairing key={mode} mode={mode === "pairing" ? "pairing" : "ready"} />}
   </div>;
 }

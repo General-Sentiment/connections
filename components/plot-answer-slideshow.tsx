@@ -1,10 +1,17 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CardFace } from "./card";
 import { arenaUrl } from "@/lib/urls";
 import type { Item } from "@/lib/types";
-export function PlotAnswerSlideshow({ prompt, answers }: { prompt: string; answers: { item: Item; author: string }[] }) {
+export function PlotAnswerSlideshow({ prompt, answers, autoAdvance = false }: { prompt: string; answers: { item: Item; author: string }[]; autoAdvance?: boolean }) {
   const [index, setIndex] = useState(0);
+  useEffect(() => {
+    if (!autoAdvance || answers.length < 2) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") setIndex(current => (current + 1) % answers.length);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [autoAdvance, answers.length]);
   const activeIndex = Math.min(index, Math.max(0, answers.length - 1));
   const answer = answers[activeIndex];
   const move = (direction: number) => setIndex((activeIndex + direction + answers.length) % answers.length);
