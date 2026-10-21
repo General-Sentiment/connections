@@ -1,4 +1,5 @@
 "use client";
+import { broadcastPlotUpdate, subscribePlotUpdates } from "@/lib/plot-broadcast";
 import { StateSelect } from "./state-select";
 import { useEffect, useRef, useState } from "react";
 type Runs = { activePrompt: "one" | "two"; mode: "inactive" | "ready" | "pairing" | "prompt"; attendees: { userId: number; profileId: number; name: string }[]; checkedInCount: number; activeRunId: number | null; runs: { id: number; title: string | null; createdAt: string; pairCount: number }[] };
@@ -19,9 +20,10 @@ export function PlotRuns() {
     }
     void load();
     const refresh = () => { void load(); };
+    const unsubscribe = subscribePlotUpdates(refresh);
     window.addEventListener("plot-round-published", refresh);
     window.addEventListener("focus", refresh);
-    return () => { controller.abort(); window.removeEventListener("plot-round-published", refresh); window.removeEventListener("focus", refresh); };
+    return () => { unsubscribe(); controller.abort(); window.removeEventListener("plot-round-published", refresh); window.removeEventListener("focus", refresh); };
   }, []);
   async function changeMode(mode: Runs["mode"]) {
     if (busy.current) return;
@@ -30,6 +32,7 @@ export function PlotRuns() {
       const response = await fetch("/api/plot/runs", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "State could not be saved.");
+      broadcastPlotUpdate();
       setData(current => current ? { ...current, mode: result.mode } : current);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "State could not be saved."); }
     finally { busy.current = false; setSaving(undefined); }
@@ -41,6 +44,7 @@ export function PlotRuns() {
       const response = await fetch("/api/plot/runs", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ activePrompt }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Prompt could not be selected.");
+      broadcastPlotUpdate();
       setData(current => current ? { ...current, activePrompt: result.activePrompt } : current);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Prompt could not be selected."); }
     finally { busy.current = false; setSaving(undefined); }
@@ -52,6 +56,7 @@ export function PlotRuns() {
       const response = await fetch("/api/plot/runs", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runId }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "This round could not be selected.");
+      broadcastPlotUpdate();
       setData(current => current ? { ...current, activeRunId: result.activeRunId } : current);
       window.dispatchEvent(new Event("plot-round-selected"));
     } catch (cause) { setError(cause instanceof Error ? cause.message : "This round could not be selected."); }
@@ -64,6 +69,7 @@ export function PlotRuns() {
       const response = await fetch("/api/plot/runs", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify(runId === undefined ? { all: true } : { runId }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "This round could not be deleted.");
+      broadcastPlotUpdate();
       setData(current => current ? { ...current, mode: result.mode ?? current.mode, activeRunId: result.activeRunId, runs: current.runs.filter(run => !result.deletedRunIds.includes(run.id)) } : current);
       window.dispatchEvent(new Event("plot-round-selected"));
     } catch (cause) { window.dispatchEvent(new Event("plot-round-published")); setError(cause instanceof Error ? cause.message : "This round could not be deleted."); }

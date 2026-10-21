@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { revalidateTag } from "next/cache";
 import { requireSession } from "@/lib/session";
 import { assertWrite, apiError, privateJson } from "@/lib/http";
-import { plotChannel, readPlotRound, readPlotPartnerPhoto, publishPlotRound, publishPlotInput, plotAttendance, readPlotMode, readActivePlotPrompt, readPlotPrompt } from "@/lib/plot-pairings";
+import { plotChannel, readPlotRound, readPlotPartnerPhoto, readPlotPartnerAnswers, publishPlotRound, publishPlotInput, plotAttendance, readPlotMode, readActivePlotPrompt, readPlotPrompt, readPlotPromptResponses } from "@/lib/plot-pairings";
 // Collapse focus refreshes from this worker into one invalidation per five seconds.
 const focusRuntime = globalThis as typeof globalThis & { plotFocusRefresh?: { until: number; pending?: Promise<void> } };
 const focusState = focusRuntime.plotFocusRefresh ??= { until: 0 };
@@ -25,13 +25,15 @@ export async function GET(request: NextRequest) {
     if (request.nextUrl.searchParams.get("modeOnly") === "true") {
       const activePrompt = await readActivePlotPrompt();
       const prompt = mode === "prompt" ? await readPlotPrompt(activePrompt) : null;
-      return privateJson({ mode, activePrompt, promptRevision: prompt?.revision });
+      const responses = mode === "prompt" ? await readPlotPromptResponses(activePrompt) : null;
+      const round = mode === "pairing" ? await readPlotRound(plotChannel()) : null;
+      return privateJson({ mode, activePrompt, promptRevision: prompt?.revision, answersRevision: responses?.revision, activeRunId: round?.id ?? null });
     }
     const run = mode === "pairing" ? await readPlotRound(plotChannel()) : null;
     const checkedIn = await plotAttendance(session.person.id);
     if (!run) return privateJson({ mode, runId: null, partners: [], checkedIn });
     const partners = run.pairs.flatMap(pair => pair.first.user_id === session.person.id ? [{ ...pair.second, shared: pair.shared, note: pair.note }] : pair.second.user_id === session.person.id ? [{ ...pair.first, shared: pair.shared, note: pair.note }] : []);
-    const withPhotos = await Promise.all(partners.map(async partner => ({ ...partner, photo: partner.photo !== undefined ? partner.photo : await readPlotPartnerPhoto(partner.profile_id).catch(() => null) })));
+    const withPhotos = await Promise.all(partners.map(async partner => ({ ...partner, answers: await readPlotPartnerAnswers(partner.profile_id).catch(() => null), photo: partner.photo !== undefined ? partner.photo : await readPlotPartnerPhoto(partner.profile_id).catch(() => null) })));
     return privateJson({ mode, runId: run.id, partners: withPhotos, checkedIn });
   } catch (error) { return apiError(error, { route: "/api/plot/pairings", method: "GET" }); }
 }

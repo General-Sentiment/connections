@@ -51,7 +51,6 @@ function modeOf(items: import("./types").Item[]): PlotMode {
   return state.mode ?? (state.active_run_id ? "pairing" : "ready");
 }
 export async function readPlotMode(): Promise<PlotMode> {
-  if (process.env.NODE_ENV === "production") return "inactive";
   return modeOf(await readPlotItems(plotChannel()));
 }
 export async function readActivePlotPrompt(): Promise<"one" | "two"> {
@@ -67,11 +66,17 @@ export function pinnedPrompt(items: import("./types").Item[]) {
   if (!text) throw new Error("The pinned prompt text is empty.");
   return { id: block.id, text, revision: `${block.id}:${block.updated_at}` };
 }
-export const readPlotPrompt = unstable_cache(async (active: "one" | "two") => {
+const readPlotPromptItems = unstable_cache(async (active: "one" | "two") => {
   const channel = active === "one" ? "plot-prompt-one" : "plot-prompt-two";
-  const items = await allItems(new ArenaClient(await directoryToken("") || undefined, false), `/channels/${channel}/contents`);
-  return pinnedPrompt(items);
-}, ["plot-pinned-prompts-v1"], { revalidate: 15, tags: ["plot-pairings"] });
+  return allItems(new ArenaClient(await directoryToken("") || undefined, false), `/channels/${channel}/contents`);
+}, ["plot-prompt-items-v1"], { revalidate: 15, tags: ["plot-pairings", "plot-profile-answers"] });
+export async function readPlotPrompt(active: "one" | "two") { return pinnedPrompt(await readPlotPromptItems(active)); }
+export function plotPromptResponses(items: import("./types").Item[]) {
+  const prompt = pinnedPrompt(items);
+  const answers = items.filter(item => item.id !== prompt.id && !item.connection?.pinned && item.visibility !== "private" && item.state === "available").map(item => ({ item, author: item.connection?.connected_by?.name || item.user?.name || "" }));
+  return { answers, revision: answers.map(answer => `${answer.item.type}:${answer.item.id}:${answer.item.updated_at}:${answer.item.connection?.id || ""}`).join("|") };
+}
+export async function readPlotPromptResponses(active: "one" | "two") { return plotPromptResponses(await readPlotPromptItems(active)); }
 export async function setPlotPrompt(token: string, activePrompt: "one" | "two") {
   const channel = await plotPublisher(token);
   await readPlotPrompt(activePrompt);
@@ -226,3 +231,16 @@ export const readPlotPartnerPhoto = unstable_cache(async (profileId: number) => 
   if (profile.channel.metadata?.hidden === true || profile.channel.metadata?.published !== true) return null;
   return safeUrl(profile.photo?.image?.medium?.src || profile.photo?.image?.src || profile.person.avatar) || null;
 }, ["plot-partner-photo-v1"], { revalidate: 3600 });
+
+export function profilePromptAnswers(profile: import("./types").Profile) {
+  return profile.selected.flatMap(item => {
+    const key = `${item.type === "Channel" ? "Channel" : "Block"}:${item.id}`;
+    const prompt = profile.details.selected_prompts?.[key];
+    return prompt ? [{ item, prompt, description: profile.selectedDescriptions?.[key] || "" }] : [];
+  });
+}
+export const readPlotPartnerAnswers = unstable_cache(async (profileId: number) => {
+  const profile = await readProfile(profileId, new ArenaClient(await directoryToken("") || undefined));
+  if (profile.channel.metadata?.hidden === true || profile.channel.metadata?.published !== true) return [];
+  return profilePromptAnswers(profile);
+}, ["plot-partner-answers-v1"], { revalidate: 60, tags: ["plot-profile-answers"] });

@@ -1,4 +1,5 @@
 "use client";
+import { broadcastPlotUpdate } from "@/lib/plot-broadcast";
 
 import { useEffect, useRef, useState } from "react";
 import { pairEveryone, bestMatches, matchKey, type LocationLevel, type Match } from "@/lib/matching";
@@ -77,6 +78,7 @@ export function MatchPicker({ selfId, everyone = false, publishPlot = false }: {
           if (!response.ok) throw new Error(data.error || "The Plot round could not be published.");
           result = { pairs: data.pairs, unpaired: data.unpaired };
           setSkipped(data.skipped || 0);
+          broadcastPlotUpdate();
           window.dispatchEvent(new Event("plot-round-published"));
         } else result = pairEveryone(profiles, requireLocation ? level : undefined, { seen: seenRef.current, romantic, romanticPreferences });
         for (const pair of result.pairs) seenRef.current.add(matchKey(pair.first.person.id, pair.second.person.id));

@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { NextRequest } from "next/server";
 import { assertWrite, apiError, privateJson } from "@/lib/http";
 import { requireSession } from "@/lib/session";
@@ -23,7 +24,8 @@ export async function POST(request: NextRequest) {
       }
       if (item.state !== "available") throw new ArenaError(409, "Are.na is still processing your block. Wait a moment and click Add block again; it won’t create a duplicate.");
     }
-    if (input.plotPromptId) await savePlotAnswer(session.person, session.token, { promptId: input.plotPromptId, answer: { id: item.id, type: "Block" }, description: "" });
+    if (input.plotPromptId) await savePlotAnswer(session.person, session.token, { promptId: input.plotPromptId, answer: { id: item.id, type: "Block" }, description: "" }, false);
+    revalidateTag("plot-profile-answers", { expire: 0 });
     return privateJson({ item });
   } catch (error) { return apiError(error, { route: "/api/profile/blocks", method: "POST" }); }
 }

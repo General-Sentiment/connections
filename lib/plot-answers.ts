@@ -8,7 +8,7 @@ import { itemKey } from "./urls";
 import { withLock } from "./coordination";
 import type { Person } from "./types";
 export const plotAnswerSchema = z.object({ promptId: z.number().int().positive(), answer: selectionSchema, description: z.string().trim().max(5000).default("") }).strict();
-export async function savePlotAnswer(person: Person, token: string, input: z.infer<typeof plotAnswerSchema>) {
+export async function savePlotAnswer(person: Person, token: string, input: z.infer<typeof plotAnswerSchema>, replacePrevious = true) {
   return withLock(`profile:${person.id}`, async () => {
     const client = new ArenaClient(token);
     const active = await readActivePlotPrompt();
@@ -31,7 +31,7 @@ export async function savePlotAnswer(person: Person, token: string, input: z.inf
     const key = `${input.answer.type}:${input.answer.id}`;
     const selectedPrompts = { ...profile.details.selected_prompts };
     if (selectedPrompts[key] && selectedPrompts[key].id !== prompt.id) throw new ArenaError(400, "That item already answers another profile prompt. Choose a different item.");
-    const previousKeys = Object.entries(selectedPrompts).filter(([oldKey, value]) => oldKey !== key && value.id === prompt.id).map(([oldKey]) => oldKey);
+    const previousKeys = replacePrevious ? Object.entries(selectedPrompts).filter(([oldKey, value]) => oldKey !== key && value.id === prompt.id).map(([oldKey]) => oldKey) : [];
     for (const oldKey of previousKeys) delete selectedPrompts[oldKey];
     selectedPrompts[key] = prompt;
     const description = items.find(item => roleOf(item) === "selected_description" && `${item.connection?.metadata?.selected_type}:${item.connection?.metadata?.selected_id}` === key);
