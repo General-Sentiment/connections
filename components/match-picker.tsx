@@ -18,6 +18,7 @@ export function MatchPicker({ selfId, everyone = false, publishPlot = false }: {
     window.addEventListener("plot-round-selected", clear);
     return () => window.removeEventListener("plot-round-selected", clear);
   }, [publishPlot]);
+  const [answeredActivePromptOnly, setAnsweredActivePromptOnly] = useState(true);
   const [romanticPreferences, setRomanticPreferences] = useState(true);
   const [romantic, setRomantic] = useState(false);
   const [onlyMe, setOnlyMe] = useState(false);
@@ -80,7 +81,7 @@ export function MatchPicker({ selfId, everyone = false, publishPlot = false }: {
         let result: ReturnType<typeof pairEveryone>;
         if (publishPlot) {
           setProgress("Saving the round and revealing pairings on Plot…");
-          const response = await fetch("/api/plot/pairings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(requireLocation ? { location: level } : {}), romantic, romanticPreferences }) });
+          const response = await fetch("/api/plot/pairings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(requireLocation ? { location: level } : {}), romantic, romanticPreferences, answeredActivePromptOnly }) });
           const data = await response.json();
           if (!response.ok) throw new Error(data.error || "The Plot round could not be published.");
           result = { pairs: data.pairs, unpaired: data.unpaired };
@@ -113,9 +114,10 @@ export function MatchPicker({ selfId, everyone = false, publishPlot = false }: {
   }
   return <>
     <p className="muted pair-introduction">{everyone ? "Include everyone, prioritizing shared “Open to” preferences. Fallback introductions are labeled; with an odd count, one person participates twice." : "Pair two people with the most shared “Open to” preferences."} Equally strong pairs are picked at random. {everyone ? "Previous pairs are avoided when possible." : "Pairs won’t repeat during this session."}</p>
-    {publishPlot && <p className="small muted">Pair saves and reveals a round on Plot. Only people who answered the active prompt are included.</p>}
+    {publishPlot && <p className="small muted">Pair saves and reveals a round on Plot. {answeredActivePromptOnly ? "Only people who answered the active prompt are included." : "Everyone with a published, visible profile is included."}</p>}
     <form className="match-controls" onSubmit={event => { event.preventDefault(); findMatch(); }}>
 
+      {publishPlot && <fieldset className="match-location-options" disabled={loading}><legend>Pairing pool</legend><div>{[{ value: true, label: "Answered the active prompt" }, { value: false, label: "Everyone" }].map(option => <label className="check" key={option.label}><input type="radio" name="plot-pairing-pool" checked={answeredActivePromptOnly === option.value} onChange={() => { setAnsweredActivePromptOnly(option.value); setBatch(undefined); setError(""); }} />{option.label}</label>)}</div></fieldset>}
       {!everyone && <label className="check"><input type="checkbox" disabled={loading || selfId === undefined} checked={onlyMe} onChange={event => { setOnlyMe(event.target.checked); setMatch(undefined); setError(""); }} />Only pair me</label>}
       <label className="check"><input type="checkbox" disabled={loading} checked={romantic} onChange={event => { setRomantic(event.target.checked); setMatch(undefined); setError(""); }} />Pair for romance</label>
       {romantic && <div className="pair-romance-options"><label className="check"><input type="checkbox" disabled={loading} checked={romanticPreferences} onChange={event => { setRomanticPreferences(event.target.checked); setMatch(undefined); setError(""); }} />Pair based on romantic preferences</label><p className="small muted">{romanticPreferences ? "Requires gender and sexuality details and mutual compatibility with both people’s Interested in selections." : "Pairs people who are open to romance, without filtering by gender, sexuality, or Interested in selections."}</p></div>}

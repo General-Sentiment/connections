@@ -747,3 +747,8 @@ button.empty-answer-tile{padding:0;border-radius:0;cursor:pointer;white-space:no
 .plot-slide-stage{display:grid;grid-template-columns:44px minmax(0,477px) 44px;align-items:center;justify-content:center;gap:20px}.plot-slide-stage .plot-answer-slide{width:100%;min-width:0;margin:0}.plot-slide-stage>button{width:44px;min-height:44px;font-size:22px;padding:0}@media(max-width:600px){.plot-slide-stage{grid-template-columns:32px minmax(0,1fr) 32px;gap:8px}.plot-slide-stage>button{width:32px;min-height:36px}}
 
 .window-content:has(.plot-overview-page) .account-bar-actions{display:none}
+
+.plot-overview-placeholder.plot-ready-instructions{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,370px);gap:60px;align-items:center;text-align:left}
+.plot-ready-qr{display:block;width:100%;max-width:370px;justify-self:center}
+.plot-ready-qr img{display:block;width:100%;height:auto}
+@media(max-width:750px){.plot-overview-placeholder.plot-ready-instructions{grid-template-columns:1fr;gap:40px}.plot-ready-qr{max-width:300px}}

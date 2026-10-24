@@ -128,3 +128,12 @@ it("check-out removes only the signed-in person's attendee connections", async (
   await expect(checkOutOfPlot("token", 123)).resolves.toEqual({ checkedIn: false });
   expect(disconnect).toHaveBeenCalledTimes(1);
 });
+
+it("pairs everyone without reading the prompt when that pool is selected", async () => {
+  mocks.promptItems.mockRejectedValue(new Error("No prompt configured"));
+  mocks.createBlock.mockResolvedValue({ id: 123 });
+  const result = await publishPlotRound("token", 1, { answeredActivePromptOnly: false, romantic: false, romanticPreferences: true });
+  expect(result.pairs).toHaveLength(1);
+  expect(mocks.promptItems).not.toHaveBeenCalled();
+  expect(mocks.createBlock.mock.calls[0][2]).toContain("answeredActivePromptOnly: false");
+});

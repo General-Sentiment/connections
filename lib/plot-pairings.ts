@@ -16,7 +16,7 @@ export const plotChannel = () => process.env.ARENA_PLOT_CHANNEL || "plot-kijbdhl
 const member = z.object({ user_id: z.number().int().positive(), profile_id: z.number().int().positive(), name: z.string().max(300), chair: z.number().int().min(1).max(20).optional(), photo: z.string().url().nullable().optional() }).strict();
 export const plotRunSchema = z.object({
   schema: z.literal("plot_pairings"), version: z.literal(1), created_at: z.string(), created_by: z.number().int().positive(),
-  settings: z.object({ checkedInOnly: z.boolean().optional(), location: z.enum(["city", "state", "country"]).optional(), romantic: z.boolean(), romanticPreferences: z.boolean() }),
+  settings: z.object({ answeredActivePromptOnly: z.boolean().optional(), checkedInOnly: z.boolean().optional(), location: z.enum(["city", "state", "country"]).optional(), romantic: z.boolean(), romanticPreferences: z.boolean() }),
   pairs: z.array(z.object({ first: member, second: member, shared: z.array(z.string()), note: z.string().optional() }).strict()).max(5000),
   unpaired: z.array(member),
   unavailable_profiles: z.number().int().nonnegative().optional(),
@@ -156,7 +156,7 @@ export const readPlotRound = unstable_cache(async (channel: string) => {
   return { id: block.id, ...parsePlotYaml(block.content?.markdown || "", plotRunSchema) };
 }, ["plot-active-round-v1"], { revalidate: 15, tags: ["plot-pairings"] });
 
-export const publishPlotInput = z.object({ checkedInOnly: z.boolean().default(true), location: z.enum(["city", "state", "country"]).optional(), romantic: z.boolean().default(false), romanticPreferences: z.boolean().default(true) }).strict();
+export const publishPlotInput = z.object({ answeredActivePromptOnly: z.boolean().default(true), checkedInOnly: z.boolean().default(true), location: z.enum(["city", "state", "country"]).optional(), romantic: z.boolean().default(false), romanticPreferences: z.boolean().default(true) }).strict();
 export async function publishPlotRound(token: string, userId: number, rawInput: z.input<typeof publishPlotInput>) {
   const input = publishPlotInput.parse(rawInput);
   const channel = await plotPublisher(token);
@@ -170,13 +170,11 @@ export async function publishPlotRound(token: string, userId: number, rawInput: 
     const previous = items.filter(item => item.type === "Text" && item.metadata?.role === "plot_pairings");
     const history = previous.map(item => parsePlotYaml(item.content?.markdown || "", plotRunSchema));
     const seen = new Set(history.flatMap(run => run.pairs.map(pair => matchKey(pair.first.user_id, pair.second.user_id))));
-    const active = promptOf(items);
-    const promptItems = await allItems(manager, `/channels/plot-prompt-${active === "one" ? "one" : "two"}/contents`);
-    const answered = plotPromptRespondents(promptItems);
+    const answered = input.answeredActivePromptOnly ? plotPromptRespondents(await allItems(manager, `/channels/plot-prompt-${promptOf(items)}/contents`)) : null;
     const loaded: { profiles: import("./types").Profile[]; skipped: number } = await loadMatchProfiles(groupId()!, undefined, token);
-    const profiles = loaded.profiles.filter(profile => answered.has(profile.person.id));
+    const profiles = loaded.profiles.filter(profile => !answered || answered.has(profile.person.id));
     const skipped = loaded.skipped;
-    if (profiles.length < 2) throw new Error("At least two people with readable profiles must answer the active prompt before publishing a round.");
+    if (profiles.length < 2) throw new Error(input.answeredActivePromptOnly ? "At least two people with readable profiles must answer the active prompt before publishing a round." : "At least two readable profiles are needed to publish a round.");
     const result = pairEveryone(profiles, input.location, { ...input, seen });
     const ref = (profile: typeof profiles[number]) => ({ user_id: profile.person.id, profile_id: profile.channel.id, name: profile.person.name, photo: safeUrl(profile.photo?.image?.medium?.src || profile.photo?.image?.src || profile.person.avatar) || null });
     const run = plotRunSchema.parse({ schema: "plot_pairings", version: 1, created_at: new Date().toISOString(), created_by: userId, settings: { ...input, checkedInOnly: false },
