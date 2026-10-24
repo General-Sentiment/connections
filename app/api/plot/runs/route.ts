@@ -12,7 +12,7 @@ export async function PATCH(request: NextRequest) {
   try {
     assertWrite(request);
     const session = await requireSession();
-    const input = z.union([z.object({ runId: z.number().int().positive() }).strict(), z.object({ mode: z.enum(plotModes) }).strict(), z.object({ activePrompt: z.enum(["one", "two"]) }).strict()]).parse(await request.json());
+    const input = z.union([z.object({ runId: z.number().int().positive() }).strict(), z.object({ mode: z.enum(plotModes) }).strict(), z.object({ activePrompt: z.enum(["one", "two", "three"]) }).strict()]).parse(await request.json());
     const result = "activePrompt" in input ? await setPlotPrompt(session.token, input.activePrompt) : "mode" in input ? await setPlotMode(session.token, input.mode) : await selectPlotRun(session.token, input.runId);
     revalidateTag("plot-pairings", { expire: 0 });
     return privateJson(result);

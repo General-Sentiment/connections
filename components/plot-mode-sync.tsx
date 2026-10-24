@@ -3,7 +3,7 @@ import { subscribePlotUpdates } from "@/lib/plot-broadcast";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { PlotMode } from "@/lib/plot-pairings";
-export function PlotModeSync({ mode, activePrompt, promptRevision, activeRunId, answersRevision }: { mode: PlotMode; activePrompt?: "one" | "two"; promptRevision?: string; activeRunId?: number | null; answersRevision?: string }) {
+export function PlotModeSync({ mode, activePrompt, promptRevision, activeRunId, answersRevision }: { mode: PlotMode; activePrompt?: "one" | "two" | "three"; promptRevision?: string; activeRunId?: number | null; answersRevision?: string }) {
   const router = useRouter();
   useEffect(() => {
     let stopped = false; let timer: ReturnType<typeof setTimeout>;

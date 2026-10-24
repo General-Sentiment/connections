@@ -105,3 +105,33 @@ it("includes everyone with labeled general introductions when filters cannot be 
   expect(result.unpaired).toEqual([]);
   expect(result.pairs.every(pair => pair.fallback && !pair.shared.includes("romance"))).toBe(true);
 });
+
+it("never repeats exhausted pairs through fallback introductions", () => {
+  const people = [1, 2, 3].map(id => profile(id, ["friendship"]));
+  const result = pairEveryone(people, undefined, { seen: new Set(["1:2", "1:3", "2:3"]) }, () => 0);
+  expect(result.pairs).toEqual([]);
+  expect(result.unpaired).toHaveLength(3);
+});
+it("leaves the odd person unpaired when all their previous partners are exhausted", () => {
+  const people = [1, 2, 3].map(id => profile(id, ["friendship"]));
+  const result = pairEveryone(people, undefined, { seen: new Set(["1:3", "2:3"]) }, () => 0);
+  expect(result.pairs).toHaveLength(1);
+  expect(result.unpaired.map(person => person.person.id)).toEqual([3]);
+});
+
+it("pairs rare shared preferences before more common preferences with greater overlap", () => {
+  const people = [profile(1, ["employment"]), profile(2, ["employment"]), ...[3, 4, 5, 6].map(id => profile(id, ["friendship", "conversation"]))];
+  const result = pairEveryone(people, undefined, {}, () => 0);
+  expect(result.pairs[0].shared).toEqual(["employment"]);
+});
+it("recognizes rare combinations and uses overlap within equally rare groups", () => {
+  const people = [profile(1, ["friendship", "conversation"]), profile(2, ["friendship", "conversation"]), profile(3, ["friendship"]), profile(4, ["conversation"]), profile(5, ["employment"]), profile(6, ["employment"])];
+  const result = pairEveryone(people, undefined, {}, () => 0);
+  expect(result.pairs[0].shared).toEqual(["friendship", "conversation"]);
+});
+it("excludes historical pairs before ranking scarcity", () => {
+  const people = [profile(1, ["employment"]), profile(2, ["employment"]), ...[3, 4, 5, 6].map(id => profile(id, ["friendship"]))];
+  const result = pairEveryone(people, undefined, { seen: new Set(["1:2"]) }, () => 0);
+  expect(result.pairs[0].shared).toEqual(["friendship"]);
+  expect(result.pairs.some(pair => [pair.first.person.id, pair.second.person.id].sort().join(":") === "1:2")).toBe(false);
+});

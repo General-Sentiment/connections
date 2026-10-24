@@ -23,7 +23,7 @@ export const plotRunSchema = z.object({
 }).strict();
 export const plotModes = ["inactive", "ready", "pairing", "prompt"] as const;
 export type PlotMode = typeof plotModes[number];
-export const plotStateSchema = z.object({ schema: z.literal("plot_state"), version: z.literal(1), mode: z.enum(plotModes).optional(), active_prompt: z.enum(["one", "two"]).optional(), active_run_id: z.number().int().positive().nullable(), updated_at: z.string() }).strict();
+export const plotStateSchema = z.object({ schema: z.literal("plot_state"), version: z.literal(1), mode: z.enum(plotModes).optional(), active_prompt: z.enum(["one", "two", "three"]).optional(), active_run_id: z.number().int().positive().nullable(), updated_at: z.string() }).strict();
 export function parsePlotYaml<T>(content: string, schema: z.ZodType<T>): T {
   if (content.length > 2000000) throw new Error("Plot data is too large.");
   const match = content.trim().match(/^```ya?ml\s*\n([\s\S]*?)\n```$/i);
@@ -54,7 +54,7 @@ function modeOf(items: import("./types").Item[]): PlotMode {
 export async function readPlotMode(): Promise<PlotMode> {
   return modeOf(await readPlotItems(plotChannel()));
 }
-export async function readActivePlotPrompt(): Promise<"one" | "two"> {
+export async function readActivePlotPrompt(): Promise<"one" | "two" | "three"> {
   const items = await readPlotItems(plotChannel());
   const block = items.find(item => item.type === "Text" && item.title === "state");
   return block ? parsePlotYaml(block.content?.markdown || "", plotStateSchema).active_prompt ?? "one" : "one";
@@ -67,11 +67,11 @@ export function pinnedPrompt(items: import("./types").Item[]) {
   if (!text) throw new Error("The pinned prompt text is empty.");
   return { id: block.id, text, revision: `${block.id}:${block.updated_at}` };
 }
-const readPlotPromptItems = unstable_cache(async (active: "one" | "two") => {
-  const channel = active === "one" ? "plot-prompt-one" : "plot-prompt-two";
+const readPlotPromptItems = unstable_cache(async (active: "one" | "two" | "three") => {
+  const channel = `plot-prompt-${active}`;
   return allItems(new ArenaClient(await directoryToken("") || undefined, false), `/channels/${channel}/contents`);
 }, ["plot-prompt-items-v1"], { revalidate: 15, tags: ["plot-pairings", "plot-profile-answers"] });
-export async function readPlotPrompt(active: "one" | "two") { return pinnedPrompt(await readPlotPromptItems(active)); }
+export async function readPlotPrompt(active: "one" | "two" | "three") { return pinnedPrompt(await readPlotPromptItems(active)); }
 export function plotPromptResponses(items: import("./types").Item[]) {
   const prompt = pinnedPrompt(items);
   const answers = items.filter(item => item.id !== prompt.id && !item.connection?.pinned && item.visibility !== "private" && item.state === "available").map(item => ({ item, author: item.connection?.connected_by?.name || item.user?.name || "" }));
@@ -81,8 +81,8 @@ export function plotPromptRespondents(items: import("./types").Item[]) {
   const { answers } = plotPromptResponses(items);
   return new Set(answers.map(({ item }) => Number(item.connection?.connected_by?.id)).filter(id => Number.isSafeInteger(id) && id > 0));
 }
-export async function readPlotPromptResponses(active: "one" | "two") { return plotPromptResponses(await readPlotPromptItems(active)); }
-export async function setPlotPrompt(token: string, activePrompt: "one" | "two") {
+export async function readPlotPromptResponses(active: "one" | "two" | "three") { return plotPromptResponses(await readPlotPromptItems(active)); }
+export async function setPlotPrompt(token: string, activePrompt: "one" | "two" | "three") {
   const channel = await plotPublisher(token);
   await readPlotPrompt(activePrompt);
   return withLock(`plot-pairings:${channel.id}`, async () => {

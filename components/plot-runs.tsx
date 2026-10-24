@@ -5,7 +5,7 @@ import { intentions } from "@/lib/details";
 import { safeUrl } from "@/lib/urls";
 import { StateSelect } from "./state-select";
 import { useEffect, useRef, useState } from "react";
-type Runs = { activeSettings?: { romantic: boolean; romanticPreferences: boolean; location?: string }; activePairs: { first: { user_id: number; profile_id: number; name: string; photo?: string | null; chair?: number }; second: { user_id: number; profile_id: number; name: string; photo?: string | null; chair?: number }; shared: string[]; note?: string }[]; activePrompt: "one" | "two"; mode: "inactive" | "ready" | "pairing" | "prompt"; attendees: { userId: number; profileId: number; name: string }[]; checkedInCount: number; activeRunId: number | null; runs: { id: number; title: string | null; createdAt: string; pairCount: number }[] };
+type Runs = { activeSettings?: { romantic: boolean; romanticPreferences: boolean; location?: string }; activePairs: { first: { user_id: number; profile_id: number; name: string; photo?: string | null; chair?: number }; second: { user_id: number; profile_id: number; name: string; photo?: string | null; chair?: number }; shared: string[]; note?: string }[]; activePrompt: "one" | "two" | "three"; mode: "inactive" | "ready" | "pairing" | "prompt"; attendees: { userId: number; profileId: number; name: string }[]; checkedInCount: number; activeRunId: number | null; runs: { id: number; title: string | null; createdAt: string; pairCount: number }[] };
 export function PlotRuns() {
   const [data, setData] = useState<Runs>();
   const [error, setError] = useState("");
@@ -40,7 +40,7 @@ export function PlotRuns() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "State could not be saved."); }
     finally { busy.current = false; setSaving(undefined); }
   }
-  async function changePrompt(activePrompt: "one" | "two") {
+  async function changePrompt(activePrompt: "one" | "two" | "three") {
     if (busy.current) return;
     busy.current = true; setSaving(-3); setError("");
     try {
@@ -78,7 +78,7 @@ export function PlotRuns() {
     } catch (cause) { window.dispatchEvent(new Event("plot-round-published")); setError(cause instanceof Error ? cause.message : "This round could not be deleted."); }
     finally { busy.current = false; setSaving(undefined); }
   }
-  return <section className="plot-runs" aria-label="Saved pairing rounds">{data && <StateSelect value={data.mode} disabled={saving !== undefined} onChange={mode => void changeMode(mode)} />}{data && <StateSelect label="Active prompt" value={data.activePrompt} disabled={saving !== undefined} options={[{ value: "one", label: "Prompt One" }, { value: "two", label: "Prompt Two" }]} onChange={value => void changePrompt(value)} />}<h2 className="section-heading">Pairing rounds{Boolean(data?.runs.length) && <button type="button" className="quiet" disabled={saving !== undefined} onClick={() => void remove()}>Delete all rounds</button>}</h2>
+  return <section className="plot-runs" aria-label="Saved pairing rounds">{data && <StateSelect value={data.mode} disabled={saving !== undefined} onChange={mode => void changeMode(mode)} />}{data && <StateSelect label="Active prompt" value={data.activePrompt} disabled={saving !== undefined} options={[{ value: "one", label: "Prompt One" }, { value: "two", label: "Prompt Two" }, { value: "three", label: "Prompt Three" }]} onChange={value => void changePrompt(value)} />}<h2 className="section-heading">Pairing rounds{Boolean(data?.runs.length) && <button type="button" className="quiet" disabled={saving !== undefined} onClick={() => void remove()}>Delete all rounds</button>}</h2>
     {!data && !error && <p role="status" className="small muted">Loading saved rounds…</p>}
     {error && <p role="alert" className="notice error">{error}</p>}
     {data && !data.runs.length && <p className="small muted">No saved rounds yet. Pair to create and activate the first round.</p>}

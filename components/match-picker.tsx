@@ -113,7 +113,7 @@ export function MatchPicker({ selfId, everyone = false, publishPlot = false }: {
     }
   }
   return <>
-    <p className="muted pair-introduction">{everyone ? "Include everyone, prioritizing shared “Open to” preferences. Fallback introductions are labeled; with an odd count, one person participates twice." : "Pair two people with the most shared “Open to” preferences."} Equally strong pairs are picked at random. {everyone ? "Previous pairs are avoided when possible." : "Pairs won’t repeat during this session."}</p>
+    <p className="muted pair-introduction">{everyone ? "Pair rare shared “Open to” preferences and combinations first, then prioritize the amount of overlap. Fallback introductions are labeled; with an odd count, one person may participate twice." : "Pair two people with the most shared “Open to” preferences."} Equally strong pairs are picked at random. {everyone ? "Previous pairs are never repeated. People with no new partner remain unpaired." : "Pairs won’t repeat during this session."}</p>
     {publishPlot && <p className="small muted">Pair saves and reveals a round on Plot. {answeredActivePromptOnly ? "Only people who answered the active prompt are included." : "Everyone with a published, visible profile is included."}</p>}
     <form className="match-controls" onSubmit={event => { event.preventDefault(); findMatch(); }}>
 

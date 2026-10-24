@@ -3,11 +3,11 @@ const mocks = vi.hoisted(() => ({ promptItems: vi.fn(), item: vi.fn(), allItems:
 vi.mock("next/cache", () => ({ unstable_cache: (fn: unknown) => fn }));
 vi.mock("../lib/arena", async () => { const original = await vi.importActual<typeof import("../lib/arena")>("../lib/arena"); return { ...original, ArenaClient: class { item = mocks.item; } }; });
 vi.mock("../lib/arena-discovery", () => ({ allItems: (...args: unknown[]) => String(args[1]).includes("/plot-prompt-") ? mocks.promptItems(...args) : mocks.allItems(...args) }));
-vi.mock("../lib/directory-auth", () => ({ directoryClient: mocks.manager }));
+vi.mock("../lib/directory-auth", () => ({ directoryClient: mocks.manager, directoryToken: async () => "token" }));
 vi.mock("../lib/profiles", () => ({ availableProfileRef: mocks.profileRef, readProfile: vi.fn() }));
 vi.mock("../lib/config", () => ({ groupId: () => 1 }));
 vi.mock("../lib/match-profiles", () => ({ loadMatchProfiles: mocks.load }));
-import { publishPlotRound, selectPlotRun, deletePlotRun, checkInToPlot, checkOutOfPlot, setPlotMode, plotYaml } from "../lib/plot-pairings";
+import { publishPlotRound, selectPlotRun, deletePlotRun, checkInToPlot, checkOutOfPlot, setPlotMode, setPlotPrompt, plotYaml } from "../lib/plot-pairings";
 import { demoProfiles } from "../lib/demo";
 beforeEach(async () => {
   vi.clearAllMocks();
@@ -136,4 +136,10 @@ it("pairs everyone without reading the prompt when that pool is selected", async
   expect(result.pairs).toHaveLength(1);
   expect(mocks.promptItems).not.toHaveBeenCalled();
   expect(mocks.createBlock.mock.calls[0][2]).toContain("answeredActivePromptOnly: false");
+});
+
+it("selects prompt three while preserving the active round", async () => {
+  await expect(setPlotPrompt("token", "three")).resolves.toEqual({ activePrompt: "three" });
+  expect(mocks.updateBlock.mock.calls[0][1].content).toContain("active_prompt: three");
+  expect(mocks.updateBlock.mock.calls[0][1].content).toContain("active_run_id: 4");
 });

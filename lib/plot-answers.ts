@@ -12,7 +12,7 @@ export async function savePlotAnswer(person: Person, token: string, input: z.inf
   return withLock(`profile:${person.id}`, async () => {
     const client = new ArenaClient(token);
     const active = await readActivePlotPrompt();
-    const promptChannel = await client.item("Channel", active === "one" ? "plot-prompt-one" : "plot-prompt-two");
+    const promptChannel = await client.item("Channel", `plot-prompt-${active}`);
     if (!promptChannel.can?.add_to) throw new ArenaError(403, "Your account cannot connect answers to the prompt channel.");
     const promptItems = await allItems(client, `/channels/${promptChannel.id}/contents`);
     const pinned = pinnedPrompt(promptItems);
