@@ -101,7 +101,7 @@ export async function deleteProfile(person: Person, token: string, channelId: nu
   });
 }
 
-export async function saveProfile(person: Person, token: string, raw: unknown, plot = false) {
+export async function saveProfile(person: Person, token: string, raw: unknown, plot = false, onboarding = "plot") {
   const parsed = plot ? plotProfileInputSchema.parse(raw) : profileInputSchema.parse(raw);
   const input = { ...parsed, selected: parsed.selected as z.infer<typeof profileInputSchema>["selected"] }; const client = new ArenaClient(token);
   if (!groupId()) throw new Error("The directory has not been configured yet.");
@@ -184,7 +184,7 @@ export async function saveProfile(person: Person, token: string, raw: unknown, p
       displayOrder.push(selected.prompt ? arranged.find(item => roleOf(item) === "selected_prompt" && item.id === selected.prompt!.id) : undefined, arranged.find(item => roleOf(item) === "selected" && itemKey(item) === key), arranged.find(item => roleOf(item) === "selected_description" && descriptionRef(item) === key));
     }
     for (const item of displayOrder.reverse()) if (item?.connection) await client.request(`/connections/${item.connection.id}/move`, { method: "POST", body: { movement: "move_to_top" } });
-    await (userOwned ? client : manager).updateChannel(channel.id, { title: "name" in parsed ? String(parsed.name) : (typeof channel.metadata?.profile_name === "string" ? channel.metadata.profile_name : person.name), description: `https://www.are.na/${person.slug}`, metadata: { ...channel.metadata, ...(plot ? { profile_name: "name" in parsed ? parsed.name : person.name, onboarding: "plot" } : {}), hidden: channel.metadata?.hidden === true, published: true, display_order: "position_desc", ...locationMetadata(input.details.location) } });
+    await (userOwned ? client : manager).updateChannel(channel.id, { title: "name" in parsed ? String(parsed.name) : (typeof channel.metadata?.profile_name === "string" ? channel.metadata.profile_name : person.name), description: `https://www.are.na/${person.slug}`, metadata: { ...channel.metadata, ...(plot ? { profile_name: "name" in parsed ? parsed.name : person.name, onboarding } : {}), hidden: channel.metadata?.hidden === true, published: true, display_order: "position_desc", ...locationMetadata(input.details.location) } });
 
     return { channelId: channel.id };
   });
