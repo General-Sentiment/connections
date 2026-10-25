@@ -758,6 +758,7 @@ button.empty-answer-tile{padding:0;border-radius:0;cursor:pointer;white-space:no
 .plot-overview-pair-table .pairing-table{font-size:18px;line-height:1.15}
 .plot-overview-pair-table .pairing-table th,.plot-overview-pair-table .pairing-table td{padding:.22em .5em .22em 0;vertical-align:middle}
 .plot-overview-pair-table .pairing-table th:first-child{width:12%}
+.plot-overview-pair-table .pairing-table th:first-child,.plot-overview-pair-table .pairing-table td:first-child{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
 .plot-overview-pair-table .pairing-table th:not(:first-child){width:44%}
 
 .plot-pair-number{text-align:center;width:100%;margin:0 0 36px}
