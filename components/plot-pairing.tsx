@@ -9,7 +9,7 @@ import type { Item } from "@/lib/types";
 import type { ProfilePrompt } from "@/lib/prompts";
 import { PersonProfileCard } from "./profile-card";
 import { intentions } from "@/lib/details";
-export type Pairing = { runId: number | null; partners: { user_id: number; profile_id: number; name: string; pairNumber: number; photo?: string | null; shared: string[]; answers?: { item: Item; prompt: ProfilePrompt; description: string }[] | null; note?: string }[] };
+export type Pairing = { runId: number | null; partners: { user_id: number; profile_id: number; name: string; guest?: boolean; pairNumber: number; photo?: string | null; shared: string[]; answers?: { item: Item; prompt: ProfilePrompt; description: string }[] | null; note?: string }[] };
 export function PlotPairing({ mode, preview }: { mode: "ready" | "pairing"; preview?: Pairing }) {
   const router = useRouter();
   const [pairing, setPairing] = useState<Pairing | undefined>(preview);
@@ -57,7 +57,7 @@ export function PlotPairing({ mode, preview }: { mode: "ready" | "pairing"; prev
     {pairing && mode === "ready" && <p>You’re ready for Connections at Plot.</p>}
     {mode === "pairing" && pairing?.runId === null && <p role="status">Getting ready for pairing…</p>}
     {mode === "pairing" && pairing?.runId != null && !pairing.partners.length && <p>You aren’t included in the current round. Your pairing will appear here when you’re included in a new round.</p>}
-    {pairing?.partners.map(partner => <div className="plot-pairing-person" key={`${partner.user_id}:${partner.pairNumber}`}><div className="plot-pair-number"><p>Find your pairing at this number</p><h2>{partner.pairNumber}</h2></div><PersonProfileCard id={partner.profile_id} name={partner.name} photo={partner.photo} /><div className="plot-connection-points"><h3>You connect on</h3>{partner.shared.length ? <ul>{intentions.filter(([value]) => partner.shared.includes(value)).map(([value, label]) => <li key={value}>{label}</li>)}</ul> : <p className="small muted">A chance to meet someone new.</p>}</div>{partner.note && <p className="small muted">{partner.note}</p>}
+    {pairing?.partners.map(partner => <div className="plot-pairing-person" key={`${partner.user_id}:${partner.pairNumber}`}><div className="plot-pair-number"><p>Find your pairing at this number</p><h2>{partner.pairNumber}</h2></div>{partner.guest ? <article className="card"><h2>{partner.name}</h2></article> : <PersonProfileCard id={partner.profile_id} name={partner.name} photo={partner.photo} />}<div className="plot-connection-points"><h3>You connect on</h3>{partner.shared.length ? <ul>{intentions.filter(([value]) => partner.shared.includes(value)).map(([value, label]) => <li key={value}>{label}</li>)}</ul> : <p className="small muted">A chance to meet someone new.</p>}</div>{partner.note && <p className="small muted">{partner.note}</p>}
       {partner.answers === null && <p className="small muted">Their prompt answers couldn’t be loaded. We’ll try again automatically.</p>}
       {Boolean(partner.answers?.length) && <section className="plot-partner-answers" aria-label={`${partner.name}’s prompt answers`}><h3>Their prompt answers</h3>{partner.answers!.map(answer => <div className="plot-partner-answer" key={`${answer.prompt.id}:${answer.item.type}:${answer.item.id}`}><SelectionPrompt prompt={answer.prompt} /><Card item={answer.item} />{answer.description && <p className="preview-text"><ResponseText>{answer.description}</ResponseText></p>}</div>)}</section>}
     </div>)}

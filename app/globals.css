@@ -769,3 +769,5 @@ button.empty-answer-tile{padding:0;border-radius:0;cursor:pointer;white-space:no
 
 .plot-overview-pair-table .pairing-table{font-size:var(--pair-font-size,12px)}
 .plot-overview-pair-table .pairing-table th,.plot-overview-pair-table .pairing-table td{font-size:inherit;line-height:1.15}
+
+.plot-guest-entry{max-width:477px;width:100%;margin:32px auto}.plot-guest-entry details{margin:16px 0}.plot-guest-answer form button{margin-top:20px}.plot-manual-participants{margin:28px 0}.plot-manual-participants form{max-width:477px}

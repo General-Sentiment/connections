@@ -5,12 +5,25 @@ import { intentions } from "@/lib/details";
 import { safeUrl } from "@/lib/urls";
 import { StateSelect } from "./state-select";
 import { useEffect, useRef, useState } from "react";
-type Runs = { activeSettings?: { romantic: boolean; romanticPreferences: boolean; location?: string }; activePairs: { pair_number?: number; first: { user_id: number; profile_id: number; name: string; photo?: string | null; chair?: number }; second: { user_id: number; profile_id: number; name: string; photo?: string | null; chair?: number }; shared: string[]; note?: string }[]; activePrompt: "one" | "two" | "three"; mode: "inactive" | "ready" | "pairing" | "prompt"; attendees: { userId: number; profileId: number; name: string }[]; checkedInCount: number; activeRunId: number | null; runs: { id: number; title: string | null; createdAt: string; pairCount: number }[] };
+type Runs = { manualParticipants?: { id: number; name: string }[]; activeSettings?: { romantic: boolean; romanticPreferences: boolean; location?: string }; activePairs: { pair_number?: number; first: { user_id: number; profile_id: number; name: string; guest?: boolean; photo?: string | null; chair?: number }; second: { user_id: number; profile_id: number; name: string; guest?: boolean; photo?: string | null; chair?: number }; shared: string[]; note?: string }[]; activePrompt: "one" | "two" | "three"; mode: "inactive" | "ready" | "pairing" | "prompt"; attendees: { userId: number; profileId: number; name: string }[]; checkedInCount: number; activeRunId: number | null; runs: { id: number; title: string | null; createdAt: string; pairCount: number }[] };
 export function PlotRuns() {
   const [data, setData] = useState<Runs>();
   const [error, setError] = useState("");
   const [saving, setSaving] = useState<number>();
   const busy = useRef(false);
+  const [participantName, setParticipantName] = useState("");
+  const [joinCode, setJoinCode] = useState("");
+  async function addParticipant() {
+    if (busy.current || !participantName.trim()) return;
+    busy.current = true; setSaving(-5); setError("");
+    try {
+      const response = await fetch("/api/plot/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: participantName }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not add participant.");
+      setJoinCode(result.joinCode); setParticipantName(""); broadcastPlotUpdate();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not add participant."); }
+    finally { busy.current = false; setSaving(undefined); }
+  }
   useEffect(() => {
     const controller = new AbortController();
     async function load() {
@@ -82,11 +95,12 @@ export function PlotRuns() {
     {!data && !error && <p role="status" className="small muted">Loading saved rounds…</p>}
     {error && <p role="alert" className="notice error">{error}</p>}
     {data && !data.runs.length && <p className="small muted">No saved rounds yet. Pair to create and activate the first round.</p>}
+    <section className="plot-manual-participants"><h3>Participants without an account</h3><p className="small muted">Manually added people are included in future rounds, even without a prompt answer. Give them their participant code to answer on their phone.</p><form onSubmit={event => { event.preventDefault(); void addParticipant(); }}><label className="field">Name<input value={participantName} maxLength={100} onChange={event => setParticipantName(event.target.value)} required /></label><button disabled={saving !== undefined || !participantName.trim()}>Add participant</button></form>{joinCode && <p>Participant code: <code style={{ overflowWrap: "anywhere" }}>{joinCode}</code></p>}{Boolean(data?.manualParticipants?.length) && <p>{data!.manualParticipants!.map(person => person.name).join(", ")}</p>}</section>
     <div className="plot-run-grid">{data?.runs.map((run, index) => <article className="plot-run-card" key={run.id}>
       <button type="button" className="plot-run-block" aria-pressed={data.activeRunId === run.id} disabled={saving !== undefined} onClick={() => void select(run.id)}><span>Round {data.runs.length - index}</span><span className="small muted">{new Date(run.createdAt).toLocaleString()}</span><span className="small muted">{run.pairCount} {run.pairCount === 1 ? "pair" : "pairs"} · #{run.id}</span><span>{saving === run.id ? "Saving…" : data.activeRunId === run.id ? "Active" : "Select round"}</span></button>
       <div className="plot-run-actions"><a href={`https://www.are.na/block/${run.id}`} target="_blank" rel="noopener noreferrer">Open on Are.na ↗</a><button type="button" className="quiet" disabled={saving !== undefined} onClick={() => void remove(run.id)}>Delete round</button></div>
     </article>)}</div>
-    {Boolean(data?.activePairs?.length) && <section aria-label="Active round pairings"><h3>Active round pairings</h3><div className="pairing-table-scroll"><table className="pairing-table"><thead><tr><th>Pair</th><th>Person 1</th><th>Person 2</th><th>Paired based on</th></tr></thead><tbody>{(data?.activePairs ?? []).map((pair, index) => <tr key={index}><td>{pair.pair_number ?? index + 1}</td>{[pair.first, pair.second].map((person, column) => <td key={column}><Link className="pairing-person" href={`/people/${person.profile_id}`}>{safeUrl(person.photo) ? <img src={safeUrl(person.photo)} alt="" loading="lazy" /> : <span className="pairing-avatar-placeholder" aria-hidden>{person.name.split(/\s+/).slice(0, 2).map(word => word[0]).join("")}</span>}<span>{person.name}</span></Link></td>)}<td>{pair.shared?.length ? intentions.filter(([value]) => pair.shared.includes(value)).map(([, label]) => label).join(", ") : "Random — no shared preferences"}{!pair.note && data?.activeSettings?.romantic && <div className="small muted">{data.activeSettings.romanticPreferences ? "Mutual romantic preferences" : "Open to romance"}</div>}{!pair.note && data?.activeSettings?.location && <div className="small muted">Same {data.activeSettings.location === "state" ? "state / region" : data.activeSettings.location}</div>}{pair.note && <div className="small muted">{pair.note}</div>}</td></tr>)}</tbody></table></div></section>}
+    {Boolean(data?.activePairs?.length) && <section aria-label="Active round pairings"><h3>Active round pairings</h3><div className="pairing-table-scroll"><table className="pairing-table"><thead><tr><th>Pair</th><th>Person 1</th><th>Person 2</th><th>Paired based on</th></tr></thead><tbody>{(data?.activePairs ?? []).map((pair, index) => <tr key={index}><td>{pair.pair_number ?? index + 1}</td>{[pair.first, pair.second].map((person, column) => <td key={column}><Link className="pairing-person" href={person.guest ? "/plot" : `/people/${person.profile_id}`}>{safeUrl(person.photo) ? <img src={safeUrl(person.photo)} alt="" loading="lazy" /> : <span className="pairing-avatar-placeholder" aria-hidden>{person.name.split(/\s+/).slice(0, 2).map(word => word[0]).join("")}</span>}<span>{person.name}</span></Link></td>)}<td>{pair.shared?.length ? intentions.filter(([value]) => pair.shared.includes(value)).map(([, label]) => label).join(", ") : "Random — no shared preferences"}{!pair.note && data?.activeSettings?.romantic && <div className="small muted">{data.activeSettings.romanticPreferences ? "Mutual romantic preferences" : "Open to romance"}</div>}{!pair.note && data?.activeSettings?.location && <div className="small muted">Same {data.activeSettings.location === "state" ? "state / region" : data.activeSettings.location}</div>}{pair.note && <div className="small muted">{pair.note}</div>}</td></tr>)}</tbody></table></div></section>}
     {data && data.runs.length > 0 && <p className="small muted">Selecting a round changes the pairing shown on attendees’ Plot pages.</p>}
   </section>;
 }

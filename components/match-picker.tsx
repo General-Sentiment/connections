@@ -63,7 +63,7 @@ export function MatchPicker({ selfId, everyone = false, publishPlot = false }: {
         return result.profiles as Profile[];
       };
       const [profiles] = await Promise.all([load(), minimum]);
-      if (profiles.length < 2) {
+      if (!publishPlot && profiles.length < 2) {
         setMatch(undefined);
         setError("At least two published profiles are needed to find a pair.");
         return;

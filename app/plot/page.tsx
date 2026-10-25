@@ -1,3 +1,5 @@
+import { PlotGuestEntry } from "@/components/plot-guest-entry";
+import { PlotGuestAnswer } from "@/components/plot-guest-answer";
 import { PlotPromptAnswer } from "@/components/plot-prompt-answer";
 import { readPlotMode, readActivePlotPrompt, readPlotPrompt } from "@/lib/plot-pairings";
 import { PlotModeSync } from "@/components/plot-mode-sync";
@@ -16,6 +18,16 @@ export default async function Plot() {
   const mode = await readPlotMode();
   if (mode === "inactive") redirect("/onboarding");
   const session = await getSession();
+  if (!session?.plotGuest && (!session?.person || !session.token)) return <div className="page plot-page"><Header title="Plot" parent="Connections" hideArena /><PlotModeSync mode={mode} /><PlotGuestEntry /></div>;
+  if (session?.plotGuest) {
+    const guest = session.plotGuest;
+    if (mode === "prompt") {
+      const activePrompt = await readActivePlotPrompt();
+      const prompt = await readPlotPrompt(activePrompt);
+      return <div className="page plot-page"><Header title="Plot" parent="Connections" hideArena /><PlotModeSync mode={mode} activePrompt={activePrompt} promptRevision={prompt.revision} /><div className="plot-prompt-container"><PlotGuestAnswer key={prompt.id} userId={guest.userId} prompt={prompt} /></div></div>;
+    }
+    return <div className="page plot-page"><Header title="Plot" parent="Connections" hideArena /><PlotPairing key={mode} mode={mode === "pairing" ? "pairing" : "ready"} /></div>;
+  }
   if (!session?.person || !session.token) redirect("/api/auth/login?next=/plot");
   let complete = false;
   let error = "";
@@ -28,7 +40,7 @@ export default async function Plot() {
       error = "We couldn’t check your profile. Please refresh to try again.";
     }
   }
-  if (!error && !complete) return <div className="page plot-page"><Header title="Plot" parent="Connections" hideArena /><PlotModeSync mode={mode} /><ProfileForm person={session.person} demo={false} plot /></div>;
+  if (!error && !complete) return <div className="page plot-page"><Header title="Plot" parent="Connections" hideArena /><PlotModeSync mode={mode} /><ProfileForm person={session.person} demo={false} plot /><PlotGuestEntry initialName={session.person.name} /></div>;
   if (!error && mode === "prompt") {
     const activePrompt = await readActivePlotPrompt();
     let prompt; let promptError = "";

@@ -12,7 +12,7 @@ import { safeUrl } from "./urls";
 import { withLock } from "./coordination";
 
 export const plotChannel = () => process.env.ARENA_PLOT_CHANNEL || "plot-kijbdhlt3gy";
-const member = z.object({ user_id: z.number().int().positive(), profile_id: z.number().int().positive(), name: z.string().max(300), chair: z.number().int().min(1).max(20).optional(), photo: z.string().url().nullable().optional() }).strict();
+const member = z.object({ user_id: z.number().int().positive(), profile_id: z.number().int().positive(), name: z.string().max(300), guest: z.boolean().optional(), chair: z.number().int().min(1).max(20).optional(), photo: z.string().url().nullable().optional() }).strict();
 export const plotRunSchema = z.object({
   schema: z.literal("plot_pairings"), version: z.literal(1), created_at: z.string(), created_by: z.number().int().positive(),
   settings: z.object({ answeredActivePromptOnly: z.boolean().optional(), checkedInOnly: z.boolean().optional(), location: z.enum(["city", "state", "country"]).optional(), romantic: z.boolean(), romanticPreferences: z.boolean() }),
@@ -73,14 +73,23 @@ const readPlotPromptItems = unstable_cache(async (active: "one" | "two" | "three
 export async function readPlotPrompt(active: "one" | "two" | "three") { return pinnedPrompt(await readPlotPromptItems(active)); }
 export function plotPromptResponses(items: import("./types").Item[]) {
   const prompt = pinnedPrompt(items);
-  const answers = items.filter(item => item.id !== prompt.id && !item.connection?.pinned && item.visibility !== "private" && item.state === "available").map(item => ({ item, author: item.connection?.connected_by?.name || item.user?.name || "" }));
+  const answers = items.filter(item => item.id !== prompt.id && !item.connection?.pinned && item.visibility !== "private" && item.state === "available").map(item => ({ item, author: String(item.connection?.metadata?.guest_name || item.connection?.connected_by?.name || item.user?.name || "") }));
   return { answers, revision: answers.map(answer => `${answer.item.type}:${answer.item.id}:${answer.item.updated_at}:${answer.item.connection?.id || ""}`).join("|") };
 }
 export function plotPromptRespondents(items: import("./types").Item[]) {
   const { answers } = plotPromptResponses(items);
-  return new Set(answers.map(({ item }) => Number(item.connection?.connected_by?.id)).filter(id => Number.isSafeInteger(id) && id > 0));
+  return new Set(answers.map(({ item }) => Number(item.connection?.metadata?.guest_user_id || item.connection?.connected_by?.id)).filter(id => Number.isSafeInteger(id) && id > 0));
 }
 export async function readPlotPromptResponses(active: "one" | "two" | "three") { return plotPromptResponses(await readPlotPromptItems(active)); }
+export async function readGuestPlotAnswers(userId: number) {
+  const answers = await Promise.all((["one", "two", "three"] as const).map(async active => {
+    const items = await readPlotPromptItems(active).catch(() => []);
+    if (!items.some(item => item.connection?.pinned)) return [];
+    const prompt = pinnedPrompt(items);
+    return plotPromptResponses(items).answers.filter(({ item }) => Number(item.connection?.metadata?.guest_user_id) === userId).map(({ item }) => ({ item, prompt: { id: prompt.id, text: prompt.text }, description: "" }));
+  }));
+  return answers.flat();
+}
 export async function setPlotPrompt(token: string, activePrompt: "one" | "two" | "three") {
   const channel = await plotPublisher(token);
   await readPlotPrompt(activePrompt);
@@ -171,11 +180,12 @@ export async function publishPlotRound(token: string, userId: number, rawInput: 
     const seen = new Set(history.flatMap(run => run.pairs.map(pair => matchKey(pair.first.user_id, pair.second.user_id))));
     const answered = input.answeredActivePromptOnly ? plotPromptRespondents(await allItems(manager, `/channels/plot-prompt-${promptOf(items)}/contents`)) : null;
     const loaded: { profiles: import("./types").Profile[]; skipped: number } = await loadMatchProfiles(groupId()!, undefined, token);
-    const profiles = loaded.profiles.filter(profile => !answered || answered.has(profile.person.id));
+    const guests = await (await import("./plot-guests")).readPlotGuestProfiles(answered ?? undefined);
+    const profiles = [...loaded.profiles.filter(profile => !answered || answered.has(profile.person.id)), ...guests];
     const skipped = loaded.skipped;
     if (profiles.length < 2) throw new Error(input.answeredActivePromptOnly ? "At least two people with readable profiles must answer the active prompt before publishing a round." : "At least two readable profiles are needed to publish a round.");
     const result = pairEveryone(profiles, input.location, { ...input, seen });
-    const ref = (profile: typeof profiles[number]) => ({ user_id: profile.person.id, profile_id: profile.channel.id, name: profile.person.name, photo: safeUrl(profile.photo?.image?.medium?.src || profile.photo?.image?.src || profile.person.avatar) || null });
+    const ref = (profile: typeof profiles[number]) => ({ user_id: profile.person.id, profile_id: profile.channel.id, name: profile.person.name, ...(profile.channel.metadata?.plot_guest ? { guest: true } : {}), photo: safeUrl(profile.photo?.image?.medium?.src || profile.photo?.image?.src || profile.person.avatar) || null });
     const run = plotRunSchema.parse({ schema: "plot_pairings", version: 1, created_at: new Date().toISOString(), created_by: userId, settings: { ...input, checkedInOnly: false },
       unavailable_profiles: skipped, pairs: result.pairs.map((pair, index) => ({ pair_number: index + 1, first: ref(pair.first), second: ref(pair.second), shared: pair.shared, ...(pair.fallback ? { note: pair.fallback } : {}) })), unpaired: result.unpaired.map(ref) });
     const block = await manager.createBlock(channel.id, `Pairings · ${run.created_at}`, plotYaml(run), "plot_pairings");
@@ -200,7 +210,8 @@ export async function listPlotRuns(token: string) {
   const activeBlock = items.find(item => item.id === activeRunId);
   const activeRound = activeBlock ? parsePlotYaml(activeBlock.content?.markdown || "", plotRunSchema) : null;
   const activePairs = activeRound?.pairs.map((pair, index) => ({ ...pair, pair_number: pair.pair_number ?? index + 1 })) ?? [];
-  return { activePairs, activeSettings: activeRound?.settings, activePrompt: promptOf(items), mode: modeOf(items), activeRunId, runs };
+  const manualParticipants = await (await import("./plot-guests")).readPlotGuestProfiles();
+  return { manualParticipants: manualParticipants.map(profile => ({ id: profile.person.id, name: profile.person.name })), activePairs, activeSettings: activeRound?.settings, activePrompt: promptOf(items), mode: modeOf(items), activeRunId, runs };
 }
 export async function selectPlotRun(token: string, runId: number) {
   const channel = await plotPublisher(token);

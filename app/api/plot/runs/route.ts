@@ -1,3 +1,4 @@
+import { addManualPlotGuest } from "@/lib/plot-guests";
 import { NextRequest } from "next/server";
 import { revalidateTag } from "next/cache";
 import { z } from "zod";
@@ -34,4 +35,16 @@ export async function DELETE(request: NextRequest) {
     revalidateTag("plot-pairings", { expire: 0 });
     return privateJson(result);
   } catch (error) { return apiError(error, { route: "/api/plot/runs", method: "DELETE" }); }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    assertWrite(request);
+    const session = await requireSession();
+    await plotPublisher(session.token);
+    const { name } = z.object({ name: z.string().trim().min(1).max(100) }).strict().parse(await request.json());
+    const result = await addManualPlotGuest(name, session.token);
+    revalidateTag("plot-pairings", { expire: 0 });
+    return privateJson(result);
+  } catch (error) { return apiError(error, { route: "/api/plot/runs", method: "POST" }); }
 }

@@ -1,5 +1,6 @@
+vi.mock("../lib/plot-guests", () => ({ readPlotGuestProfiles: mocks.guestProfiles }));
 import { beforeEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ promptItems: vi.fn(), item: vi.fn(), allItems: vi.fn(), createBlock: vi.fn(), updateBlock: vi.fn(), load: vi.fn(), manager: vi.fn(), profileRef: vi.fn() }));
+const mocks = vi.hoisted(() => ({ guestProfiles: vi.fn(), promptItems: vi.fn(), item: vi.fn(), allItems: vi.fn(), createBlock: vi.fn(), updateBlock: vi.fn(), load: vi.fn(), manager: vi.fn(), profileRef: vi.fn() }));
 vi.mock("next/cache", () => ({ unstable_cache: (fn: unknown) => fn }));
 vi.mock("../lib/arena", async () => { const original = await vi.importActual<typeof import("../lib/arena")>("../lib/arena"); return { ...original, ArenaClient: class { item = mocks.item; } }; });
 vi.mock("../lib/arena-discovery", () => ({ allItems: (...args: unknown[]) => String(args[1]).includes("/plot-prompt-") ? mocks.promptItems(...args) : mocks.allItems(...args) }));
@@ -11,6 +12,7 @@ import { publishPlotRound, selectPlotRun, deletePlotRun, checkInToPlot, checkOut
 import { demoProfiles } from "../lib/demo";
 beforeEach(async () => {
   vi.clearAllMocks();
+  mocks.guestProfiles.mockResolvedValue([]);
   mocks.promptItems.mockResolvedValue([
     { id: 900, type: "Text", state: "available", visibility: "public", connection: { pinned: true }, content: { markdown: "Question?" } },
     ...demoProfiles.slice(0, 2).map((profile, index) => ({ id: 901 + index, type: "Text", state: "available", visibility: "public", connection: { connected_by: { id: profile.person.id } } })),
@@ -153,4 +155,18 @@ it("assigns every pair a unique shared number beyond the first ten pairs", async
   expect(run.pairs).toHaveLength(12);
   expect(run.pairs.map(pair => pair.pair_number)).toEqual(Array.from({ length: 12 }, (_, index) => index + 1));
   expect(run.pairs.every(pair => pair.first.chair === undefined && pair.second.chair === undefined)).toBe(true);
+});
+
+it("saves named guests in pairings with a shared pair number", async () => {
+  mocks.load.mockResolvedValue({ profiles: [], skipped: 0 });
+  mocks.guestProfiles.mockResolvedValue(["Taylor Guest", "Morgan Guest"].map((name, index) => ({ ...demoProfiles[index], person: { ...demoProfiles[index].person, id: 100000000000001 + index, name }, channel: { ...demoProfiles[index].channel, id: 100000000000001 + index, metadata: { plot_guest: true } } })));
+  mocks.allItems.mockResolvedValue([]);
+  mocks.createBlock.mockResolvedValue({ id: 123 });
+  await publishPlotRound("token", 1, { answeredActivePromptOnly: false });
+  const run = parsePlotYaml(mocks.createBlock.mock.calls[0][2], plotRunSchema);
+  expect(run.pairs).toHaveLength(1);
+  expect([run.pairs[0].first.name, run.pairs[0].second.name].sort()).toEqual(["Morgan Guest", "Taylor Guest"]);
+  expect(run.pairs[0].first.guest).toBe(true);
+  expect(run.pairs[0].second.guest).toBe(true);
+  expect(run.pairs[0].pair_number).toBe(1);
 });
