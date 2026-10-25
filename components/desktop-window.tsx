@@ -4,13 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 export function DesktopWindow({ children, logout }: { children: React.ReactNode; logout?: React.ReactNode }) {
+  const pathname = usePathname();
+  const plotRoute = /^\/(?:plot(?:-overview)?|pair-plot)(?:\/|$)/.test(pathname) || /^\/sandbox\/plot(?:-|\/|$)/.test(pathname);
   const searchParams = useSearchParams();
   const intro = searchParams.get("intro");
   const hasError = searchParams.has("error");
-  const [open, setOpen] = useState(intro === "skip" || hasError);
+  const [open, setOpen] = useState(plotRoute || intro === "skip" || hasError);
   const [launching, setLaunching] = useState(false);
   const launchTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const pathname = usePathname();
   const introStarted = useRef(false);
   const [fullscreen, setFullscreen] = useState(false);
   const viewport = useRef<HTMLDivElement>(null);
@@ -33,7 +34,7 @@ export function DesktopWindow({ children, logout }: { children: React.ReactNode;
   useEffect(() => { viewport.current?.scrollTo(0, 0); }, [pathname]);
 
   useEffect(() => {
-    if (intro === "skip" || hasError) {
+    if (plotRoute || intro === "skip" || hasError) {
       introStarted.current = true;
       launchTimers.current.forEach(clearTimeout);
       if (animationFrame.current !== null) { cancelAnimationFrame(animationFrame.current); animationFrame.current = null; }
@@ -77,7 +78,7 @@ export function DesktopWindow({ children, logout }: { children: React.ReactNode;
       launchTimers.current.forEach(clearTimeout);
       document.removeEventListener("visibilitychange", start);
     };
-  }, [intro, hasError]);
+  }, [intro, hasError, plotRoute]);
 
   useEffect(() => () => {
     if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current);
