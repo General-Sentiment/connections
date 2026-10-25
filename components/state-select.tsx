@@ -1,6 +1,6 @@
 "use client";
 import { useId, useRef } from "react";
-const states = ["inactive", "ready", "pairing", "prompt"] as const;
+const states = ["inactive", "ready", "prompt", "pairing"] as const;
 export function StateSelect<T extends string>({ value, disabled, onChange, label = "State", options }: { value: T; disabled: boolean; onChange: (value: T) => void; label?: string; options?: readonly { value: T; label: string }[] }) {
   const choices = options || states.map(state => ({ value: state as T, label: state[0].toUpperCase() + state.slice(1) }));
   const id = useId();

@@ -1,3 +1,4 @@
+import { normalizeParticipantName, normalizeParticipantCode } from "./plot-participant-input";
 import { createHash, randomUUID, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { directoryClient } from "./directory-auth";
@@ -7,7 +8,7 @@ import { plotChannel, plotYaml, parsePlotYaml, readActivePlotPrompt, pinnedPromp
 import { withLock } from "./coordination";
 import { blankDetails } from "./details";
 import type { Profile } from "./types";
-export const guestInput = z.object({ id: z.string().uuid(), secret: z.string().min(32).max(128), name: z.string().trim().min(1).max(100) });
+export const guestInput = z.object({ id: z.string().transform(normalizeParticipantCode).pipe(z.string().uuid()), secret: z.string().transform(normalizeParticipantCode).pipe(z.string().min(32).max(128)), name: z.string().transform(normalizeParticipantName).pipe(z.string().min(1).max(100)) });
 const record = z.object({ id: z.string().uuid(), userId: z.number().int().positive(), name: z.string(), secretHash: z.string(), manual: z.boolean() });
 const registry = z.object({ schema: z.literal("plot_participants"), participants: z.array(record) });
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -19,6 +20,7 @@ async function read(token = "") {
   return { manager, block: blocks[0], data: blocks[0] ? parsePlotYaml(blocks[0].content?.markdown || "", registry) : { schema: "plot_participants" as const, participants: [] } };
 }
 export async function registerPlotGuest(input: z.infer<typeof guestInput>, manual = false, token = "") {
+  input = guestInput.parse(input);
   return withLock(`plot-guests:${plotChannel()}`, async () => {
     const { manager, block, data } = await read(token);
     const existing = data.participants.find(person => person.id === input.id);

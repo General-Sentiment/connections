@@ -1,4 +1,5 @@
 "use client";
+import { normalizeParticipantName, normalizeParticipantCode } from "@/lib/plot-participant-input";
 import { useEffect, useState } from "react";
 const storageKey = "connections:plot-guest";
 export function PlotGuestEntry({ initialName = "" }: { initialName?: string }) {
@@ -13,8 +14,10 @@ export function PlotGuestEntry({ initialName = "" }: { initialName?: string }) {
     try {
       let saved;
       try { saved = JSON.parse(localStorage.getItem(storageKey) || "null"); } catch {}
-      const [codeId, codeSecret] = code.trim().split(".");
-      const identity = { id: codeId || saved?.id || crypto.randomUUID(), secret: codeSecret || saved?.secret || crypto.randomUUID() + crypto.randomUUID(), name: name.trim() };
+      const normalizedCode = normalizeParticipantCode(code);
+      const [codeId, codeSecret, extra] = normalizedCode.split(".");
+      if (normalizedCode && (!codeId || !codeSecret || extra !== undefined)) throw new Error("Enter the complete participant code, including the dot.");
+      const identity = { id: codeId || saved?.id || crypto.randomUUID(), secret: codeSecret || saved?.secret || crypto.randomUUID() + crypto.randomUUID(), name: normalizeParticipantName(name) };
       localStorage.setItem(storageKey, JSON.stringify(identity));
       const response = await fetch("/api/plot/guest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(identity) });
       const data = await response.json();
