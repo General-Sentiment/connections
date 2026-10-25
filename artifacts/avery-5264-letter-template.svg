@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="8.5in" height="11in" viewBox="0 0 612 792">
+  <title>Avery 5264 — six-label US Letter template</title>
+  <desc>8.5 x 11 inches. Six labels, each 4 x 3 1/3 inches. Top/bottom margins 0.5 inch; side margins 0.15625 inch; column gap 0.1875 inch; no row gap. Coordinates are points (72 per inch). Outline corner radius is approximate. Remove or hide label-guides before printing artwork on label stock. Print at 100 percent / Actual Size.</desc>
+  <!-- Each content group uses local coordinates: 288 x 240 points. Keep important artwork at least 9 points inside the label edges. -->
+  <g id="label-1" transform="translate(11.25 36)">
+    <title>Label 1 — add artwork here (288 × 240 pt)</title>
+  </g>
+  <g id="label-2" transform="translate(312.75 36)">
+    <title>Label 2 — add artwork here (288 × 240 pt)</title>
+  </g>
+  <g id="label-3" transform="translate(11.25 276)">
+    <title>Label 3 — add artwork here (288 × 240 pt)</title>
+  </g>
+  <g id="label-4" transform="translate(312.75 276)">
+    <title>Label 4 — add artwork here (288 × 240 pt)</title>
+  </g>
+  <g id="label-5" transform="translate(11.25 516)">
+    <title>Label 5 — add artwork here (288 × 240 pt)</title>
+  </g>
+  <g id="label-6" transform="translate(312.75 516)">
+    <title>Label 6 — add artwork here (288 × 240 pt)</title>
+  </g>
+  <!-- Sticker cut positions: hidden so they do not print. Set display="inline" for an alignment test. -->
+  <g id="label-guides" display="none" fill="none" stroke="#999999" stroke-width="0.5">
+    <rect x="11.25" y="36" width="288" height="240" rx="13.5"/>
+    <rect x="312.75" y="36" width="288" height="240" rx="13.5"/>
+    <rect x="11.25" y="276" width="288" height="240" rx="13.5"/>
+    <rect x="312.75" y="276" width="288" height="240" rx="13.5"/>
+    <rect x="11.25" y="516" width="288" height="240" rx="13.5"/>
+    <rect x="312.75" y="516" width="288" height="240" rx="13.5"/>
+  </g>
+</svg>

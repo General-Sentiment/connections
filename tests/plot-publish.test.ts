@@ -7,7 +7,7 @@ vi.mock("../lib/directory-auth", () => ({ directoryClient: mocks.manager, direct
 vi.mock("../lib/profiles", () => ({ availableProfileRef: mocks.profileRef, readProfile: vi.fn() }));
 vi.mock("../lib/config", () => ({ groupId: () => 1 }));
 vi.mock("../lib/match-profiles", () => ({ loadMatchProfiles: mocks.load }));
-import { publishPlotRound, selectPlotRun, deletePlotRun, checkInToPlot, checkOutOfPlot, setPlotMode, setPlotPrompt, plotYaml } from "../lib/plot-pairings";
+import { publishPlotRound, selectPlotRun, deletePlotRun, checkInToPlot, checkOutOfPlot, setPlotMode, setPlotPrompt, parsePlotYaml, plotRunSchema, plotYaml } from "../lib/plot-pairings";
 import { demoProfiles } from "../lib/demo";
 beforeEach(async () => {
   vi.clearAllMocks();
@@ -142,4 +142,15 @@ it("selects prompt three while preserving the active round", async () => {
   await expect(setPlotPrompt("token", "three")).resolves.toEqual({ activePrompt: "three" });
   expect(mocks.updateBlock.mock.calls[0][1].content).toContain("active_prompt: three");
   expect(mocks.updateBlock.mock.calls[0][1].content).toContain("active_run_id: 4");
+});
+
+it("assigns every pair a unique shared number beyond the first ten pairs", async () => {
+  mocks.load.mockResolvedValue({ profiles: Array.from({ length: 24 }, (_, index) => ({ ...demoProfiles[0], person: { ...demoProfiles[0].person, id: index + 1 } })), skipped: 0 });
+  mocks.allItems.mockResolvedValue([]);
+  mocks.createBlock.mockResolvedValue({ id: 123 });
+  await publishPlotRound("token", 1, { answeredActivePromptOnly: false, romantic: false, romanticPreferences: true });
+  const run = parsePlotYaml(mocks.createBlock.mock.calls[0][2], plotRunSchema);
+  expect(run.pairs).toHaveLength(12);
+  expect(run.pairs.map(pair => pair.pair_number)).toEqual(Array.from({ length: 12 }, (_, index) => index + 1));
+  expect(run.pairs.every(pair => pair.first.chair === undefined && pair.second.chair === undefined)).toBe(true);
 });

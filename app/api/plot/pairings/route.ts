@@ -31,10 +31,10 @@ export async function GET(request: NextRequest) {
     }
     const run = mode === "pairing" ? await readPlotRound(plotChannel()) : null;
     if (!run) return privateJson({ mode, runId: null, partners: [] });
-    const partners = run.pairs.flatMap(pair => pair.first.user_id === session.person.id ? [{ ...pair.second, shared: pair.shared, note: pair.note }] : pair.second.user_id === session.person.id ? [{ ...pair.first, shared: pair.shared, note: pair.note }] : [])
+    const partners = run.pairs.flatMap((pair, index) => pair.first.user_id === session.person.id ? [{ ...pair.second, shared: pair.shared, note: pair.note, pairNumber: pair.pair_number ?? index + 1 }] : pair.second.user_id === session.person.id ? [{ ...pair.first, shared: pair.shared, note: pair.note, pairNumber: pair.pair_number ?? index + 1 }] : [])
       .filter(partner => partner.user_id !== session.person.id);
     const withPhotos = await Promise.all(partners.map(async partner => ({ ...partner, answers: await readPlotPartnerAnswers(partner.profile_id).catch(() => null), photo: partner.photo !== undefined ? partner.photo : await readPlotPartnerPhoto(partner.profile_id).catch(() => null) })));
-    return privateJson({ mode, runId: run.id, chair: run.pairs.flatMap(pair => [pair.first, pair.second]).find(person => person.user_id === session.person.id && person.chair !== undefined)?.chair ?? null, partners: withPhotos });
+    return privateJson({ mode, runId: run.id, partners: withPhotos });
   } catch (error) { return apiError(error, { route: "/api/plot/pairings", method: "GET" }); }
 }
 export async function POST(request: NextRequest) {

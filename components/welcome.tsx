@@ -15,6 +15,7 @@ export function Welcome() {
       <svg className="connections-mark welcome-mark" viewBox="0 0 54 36" fill="none" aria-hidden="true"><circle cx="17" cy="18" r="14" /><circle cx="37" cy="18" r="14" /></svg>
       <h1 id="welcome-title">Connections</h1>
       <p>Meet people through what they collect and create on Are.na. Find conversation, friendship, creative partners, romance, or just someone new to meet.</p>
+      <p><strong>Note:</strong> You must first sign up or login to <a href="https://www.are.na" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>Are.na</a>.</p>
       <Suspense><WelcomeAction /></Suspense>
       {aboutId && <a className="button welcome-learn-more" href={`https://www.are.na/block/${aboutId}`} target="_blank" rel="noopener noreferrer">Learn more</a>}
     </div>

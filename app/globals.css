@@ -746,9 +746,22 @@ button.empty-answer-tile{padding:0;border-radius:0;cursor:pointer;white-space:no
 
 .plot-slide-stage{display:grid;grid-template-columns:44px minmax(0,477px) 44px;align-items:center;justify-content:center;gap:20px}.plot-slide-stage .plot-answer-slide{width:100%;min-width:0;margin:0}.plot-slide-stage>button{width:44px;min-height:44px;font-size:22px;padding:0}@media(max-width:600px){.plot-slide-stage{grid-template-columns:32px minmax(0,1fr) 32px;gap:8px}.plot-slide-stage>button{width:32px;min-height:36px}}
 
-.window-content:has(.plot-overview-page) .account-bar-actions{display:none}
+.window-content:has(.plot-overview-page) .account-bar{display:none}
 
 .plot-overview-placeholder.plot-ready-instructions{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,370px);gap:60px;align-items:center;text-align:left}
 .plot-ready-qr{display:block;width:100%;max-width:370px;justify-self:center}
 .plot-ready-qr img{display:block;width:100%;height:auto}
 @media(max-width:750px){.plot-overview-placeholder.plot-ready-instructions{grid-template-columns:1fr;gap:40px}.plot-ready-qr{max-width:300px}}
+
+.plot-overview-pairs{padding-top:0}
+.plot-overview-pair-table{width:100%}
+.plot-overview-pair-table .pairing-table{font-size:18px;line-height:1.15}
+.plot-overview-pair-table .pairing-table th,.plot-overview-pair-table .pairing-table td{padding:.22em .5em .22em 0;vertical-align:middle}
+.plot-overview-pair-table .pairing-table th:first-child{width:12%}
+.plot-overview-pair-table .pairing-table th:not(:first-child){width:44%}
+
+.plot-pair-number{text-align:center;width:100%;margin:0 0 36px}
+.plot-pair-number p{font-size:16px;margin:0 0 12px;color:var(--muted)}
+.plot-pair-number h2{font-size:clamp(96px,18vw,180px);font-weight:400;line-height:1;margin:0}
+
+.plot-overview-pair-table .pairing-table th,.plot-overview-pair-table .pairing-table td{white-space:nowrap;overflow-wrap:normal}

@@ -9,12 +9,13 @@ import type { Item } from "@/lib/types";
 import type { ProfilePrompt } from "@/lib/prompts";
 import { PersonProfileCard } from "./profile-card";
 import { intentions } from "@/lib/details";
-type Pairing = { chair?: number | null; runId: number | null; checkedIn: boolean; partners: { user_id: number; profile_id: number; name: string; chair?: number; photo?: string | null; shared: string[]; answers?: { item: Item; prompt: ProfilePrompt; description: string }[] | null; note?: string }[] };
-export function PlotPairing({ mode }: { mode: "ready" | "pairing" }) {
+export type Pairing = { runId: number | null; partners: { user_id: number; profile_id: number; name: string; pairNumber: number; photo?: string | null; shared: string[]; answers?: { item: Item; prompt: ProfilePrompt; description: string }[] | null; note?: string }[] };
+export function PlotPairing({ mode, preview }: { mode: "ready" | "pairing"; preview?: Pairing }) {
   const router = useRouter();
-  const [pairing, setPairing] = useState<Pairing>();
+  const [pairing, setPairing] = useState<Pairing | undefined>(preview);
   const [error, setError] = useState("");
   useEffect(() => {
+    if (preview) return;
     let stopped = false; let timer: ReturnType<typeof setTimeout>;
     const controller = new AbortController();
     let inFlight = false;
@@ -50,14 +51,13 @@ export function PlotPairing({ mode }: { mode: "ready" | "pairing" }) {
     window.addEventListener("focus", onVisible);
     window.addEventListener("pageshow", onVisible);
     return () => { unsubscribe(); stopped = true; clearTimeout(timer); controller.abort(); document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("focus", onVisible); window.removeEventListener("pageshow", onVisible); };
-  }, [mode, router]);
-  return <section className={`plot-pairing${!pairing || !pairing.partners.length ? " plot-checkin-waiting" : ""}`} aria-live="polite">{pairing && pairing.runId !== null && <h2>{pairing.partners.length ? "Your Plot pairing" : "You’re ready for Connections at Plot"}</h2>}
+  }, [mode, router, preview]);
+  return <section className={`plot-pairing${!pairing || !pairing.partners.length ? " plot-checkin-waiting" : ""}`} aria-live="polite">{pairing && pairing.runId !== null && !pairing.partners.length && <h2>You’re ready for Connections at Plot</h2>}
     {!pairing && !error && <div role="status" aria-label="Loading your pairing"><span className="loading-spinner plot-loading-spinner" aria-hidden="true" /></div>}
     {pairing && mode === "ready" && <p>You’re ready for Connections at Plot.</p>}
     {mode === "pairing" && pairing?.runId === null && <p role="status">Getting ready for pairing…</p>}
     {mode === "pairing" && pairing?.runId != null && !pairing.partners.length && <p>You aren’t included in the current round. Your pairing will appear here when you’re included in a new round.</p>}
-    {pairing?.partners.length ? <p className="plot-chair-assignment">{pairing.chair ? `Your chair: ${pairing.chair}` : "No chair assigned this round"}</p> : null}
-    {pairing?.partners.map(partner => <div className="plot-pairing-person" key={partner.user_id}><PersonProfileCard id={partner.profile_id} name={partner.name} photo={partner.photo} />{partner.chair && <p>Partner’s chair: {partner.chair}</p>}<div className="plot-connection-points"><h3>You connect on</h3>{partner.shared.length ? <ul>{intentions.filter(([value]) => partner.shared.includes(value)).map(([value, label]) => <li key={value}>{label}</li>)}</ul> : <p className="small muted">A chance to meet someone new.</p>}</div>{partner.note && <p className="small muted">{partner.note}</p>}
+    {pairing?.partners.map(partner => <div className="plot-pairing-person" key={`${partner.user_id}:${partner.pairNumber}`}><div className="plot-pair-number"><p>Find your pairing at this number</p><h2>{partner.pairNumber}</h2></div><PersonProfileCard id={partner.profile_id} name={partner.name} photo={partner.photo} /><div className="plot-connection-points"><h3>You connect on</h3>{partner.shared.length ? <ul>{intentions.filter(([value]) => partner.shared.includes(value)).map(([value, label]) => <li key={value}>{label}</li>)}</ul> : <p className="small muted">A chance to meet someone new.</p>}</div>{partner.note && <p className="small muted">{partner.note}</p>}
       {partner.answers === null && <p className="small muted">Their prompt answers couldn’t be loaded. We’ll try again automatically.</p>}
       {Boolean(partner.answers?.length) && <section className="plot-partner-answers" aria-label={`${partner.name}’s prompt answers`}><h3>Their prompt answers</h3>{partner.answers!.map(answer => <div className="plot-partner-answer" key={`${answer.prompt.id}:${answer.item.type}:${answer.item.id}`}><SelectionPrompt prompt={answer.prompt} /><Card item={answer.item} />{answer.description && <p className="preview-text"><ResponseText>{answer.description}</ResponseText></p>}</div>)}</section>}
     </div>)}

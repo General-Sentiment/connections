@@ -1,4 +1,3 @@
-import { assignPlotChairs } from "./plot-chairs";
 import { z } from "zod";
 import { parseDocument, stringify } from "yaml";
 import { unstable_cache } from "next/cache";
@@ -17,7 +16,7 @@ const member = z.object({ user_id: z.number().int().positive(), profile_id: z.nu
 export const plotRunSchema = z.object({
   schema: z.literal("plot_pairings"), version: z.literal(1), created_at: z.string(), created_by: z.number().int().positive(),
   settings: z.object({ answeredActivePromptOnly: z.boolean().optional(), checkedInOnly: z.boolean().optional(), location: z.enum(["city", "state", "country"]).optional(), romantic: z.boolean(), romanticPreferences: z.boolean() }),
-  pairs: z.array(z.object({ first: member, second: member, shared: z.array(z.string()), note: z.string().optional() }).strict()).max(5000),
+  pairs: z.array(z.object({ pair_number: z.number().int().positive().optional(), first: member, second: member, shared: z.array(z.string()), note: z.string().optional() }).strict()).max(5000),
   unpaired: z.array(member),
   unavailable_profiles: z.number().int().nonnegative().optional(),
 }).strict();
@@ -178,7 +177,7 @@ export async function publishPlotRound(token: string, userId: number, rawInput: 
     const result = pairEveryone(profiles, input.location, { ...input, seen });
     const ref = (profile: typeof profiles[number]) => ({ user_id: profile.person.id, profile_id: profile.channel.id, name: profile.person.name, photo: safeUrl(profile.photo?.image?.medium?.src || profile.photo?.image?.src || profile.person.avatar) || null });
     const run = plotRunSchema.parse({ schema: "plot_pairings", version: 1, created_at: new Date().toISOString(), created_by: userId, settings: { ...input, checkedInOnly: false },
-      unavailable_profiles: skipped, pairs: assignPlotChairs(result.pairs.map(pair => ({ first: ref(pair.first), second: ref(pair.second), shared: pair.shared, ...(pair.fallback ? { note: pair.fallback } : {}) })), history), unpaired: result.unpaired.map(ref) });
+      unavailable_profiles: skipped, pairs: result.pairs.map((pair, index) => ({ pair_number: index + 1, first: ref(pair.first), second: ref(pair.second), shared: pair.shared, ...(pair.fallback ? { note: pair.fallback } : {}) })), unpaired: result.unpaired.map(ref) });
     const block = await manager.createBlock(channel.id, `Pairings · ${run.created_at}`, plotYaml(run), "plot_pairings");
     // Publish the pointer last: readers never see a partially written run.
     const state = plotYaml({ schema: "plot_state", version: 1, active_prompt: promptOf(items), mode: modeOf(items), active_run_id: block.id, updated_at: new Date().toISOString() });
@@ -200,7 +199,7 @@ export async function listPlotRuns(token: string) {
   }).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id - a.id);
   const activeBlock = items.find(item => item.id === activeRunId);
   const activeRound = activeBlock ? parsePlotYaml(activeBlock.content?.markdown || "", plotRunSchema) : null;
-  const activePairs = activeRound?.pairs ?? [];
+  const activePairs = activeRound?.pairs.map((pair, index) => ({ ...pair, pair_number: pair.pair_number ?? index + 1 })) ?? [];
   return { activePairs, activeSettings: activeRound?.settings, activePrompt: promptOf(items), mode: modeOf(items), activeRunId, runs };
 }
 export async function selectPlotRun(token: string, runId: number) {
